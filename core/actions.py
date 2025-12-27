@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from typing import Optional
 
 class ActionType(Enum):
-    DRAW_DECK = auto()
-    PICKUP_DISCARD = auto()
-    FLIP_DRAWN = auto()
-    FLIP_OWN = auto()
-    DISCARD = auto()
-    CALL_JOKER = auto()
+    DRAW_DECK = 0
+    PICKUP_DISCARD = 1
+    FLIP_DRAWN = 2
+    FLIP_OWN = 3
+    DISCARD = 4
+    CALL_JOKER = 5
 
 @dataclass
 class Action:

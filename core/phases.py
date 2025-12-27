@@ -1,6 +1,6 @@
-from enum import Enum, auto
+from enum import Enum
 
 class TurnPhase(Enum):
-    DRAW = auto()
-    FLIP = auto()
-    DISCARD = auto()
+    DRAW = 0
+    FLIP = 1
+    DISCARD = 2

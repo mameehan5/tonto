@@ -3,17 +3,16 @@ from core.actions import Action, ActionType
 from env.state import GameState, PlayerState
 from core.phases import TurnPhase
 
-def legal_actions(env) -> List[Action]:
+def legal_actions(env, phase) -> List[Action]:
     state = env.state
     player = state.players[state.current_player]
     actions: List[Action] = []
 
     # DRAW
-    if state.phase == TurnPhase.DRAW:
-        if state.draw_deck:
-            actions.append(Action(ActionType.DRAW_DECK))
-        if len(state.discard_pile) > 0:
-            actions.append(Action(ActionType.PICKUP_DISCARD, len(state.discard_pile)))
+    if phase == TurnPhase.DRAW:
+        actions.append(Action(ActionType.DRAW_DECK))
+        max_discard = min(len(state.discard_pile), player.count_not_face_up())
+        actions.append(Action(ActionType.PICKUP_DISCARD, len(state.discard_pile)))
         return actions
 
     # FLIP
@@ -38,6 +37,26 @@ def legal_actions(env) -> List[Action]:
         return actions
 
     return []
+
+def print_legal_actions(actions: List[Action]):
+    for idx, act in enumerate(actions):
+        desc = act.type.name
+        if act.data is not None:
+            desc += f" ({act.data})"
+        print(f"{idx}: {desc}")
+
+def choose_action(actions: List[Action]) -> Action:
+    choice = None
+    while choice is None:
+        try:
+            idx = int(input("Choose action index: "))
+            if 0 <= idx < len(actions):
+                choice = actions[idx]
+            else:
+                print("Invalid index")
+        except ValueError:
+            print("Enter a number")
+    return choice
 
 def apply_action(env, action: Action):
     state = env.state

@@ -7,35 +7,36 @@ from core.engine import apply_action
 class CardGameEnv:
     def __init__(self, config):
         self.config = config
-        self.players = [PlayerState([]) for _ in range(config.num_players)]
-        self.state: GameState = None
         self.pending_draw = None
         self.pending_source = None
         self.pending_count = 0
         self.just_flipped = []
 
         # Initialize first round automatically
-        self.init_round(0)
+        self.initialize_game()
+        self.initialize_players()
 
-    def init_round(self, round_number):
-        rng = random.Random(self.config.seed + round_number)
+    def initialize_game(self):
+        rng = random.Random(self.config.seed)
         deck = create_standard_deck(self.config.num_decks)
         rng.shuffle(deck)
 
-        for player in self.players:
-            player.cards = [deck.pop() for _ in range(self.config.cards_per_player)]
-            player.face_up.clear()
-            player.private_seen.clear()
-
         self.state = GameState(
-            players=self.players,
+            players=[],
             draw_deck=deck,
             discard_pile=[deck.pop()],
             current_player=0,
-            phase=TurnPhase.DRAW,
-            round_number=round_number,
+            # phase=TurnPhase.DRAW,
+            round_number=0,
             rng=rng
         )
+    
+    def initialize_players(self):
+        players = []
+        for _ in range(self.config.num_players):
+            hand = [self.state.draw_deck.pop() for _ in range(self.config.cards_per_player)]
+            players.append(PlayerState(hand))
+        self.state.players = players
 
     def advance_turn(self):
         if all(len(p.face_up) == len(p.cards) for p in self.players):
