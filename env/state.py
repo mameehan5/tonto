@@ -8,6 +8,7 @@ class PlayerState:
         self.num_cards = len(self.cards)
         self.face_up = [False] * self.num_cards
         self.private_seen = [True] * (self.num_cards // 2) + [False] * (self.num_cards // 2)
+        self.individual_scores: List[int] = []
 
     def is_face_up(self, idx: int) -> bool:
         return self.face_up[idx]
@@ -25,6 +26,10 @@ class PlayerState:
         if self.face_up[idx] is True:
             raise ValueError(f'Card index {idx} is already flipped up')
         self.face_up[idx] = True
+    
+    @property
+    def score(self) -> int:
+        return sum(self.individual_scores)
 
 class GameState:
     def __init__(self, players: List[PlayerState], draw_deck: List[Card], discard_pile: List[Card],
