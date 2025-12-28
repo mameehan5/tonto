@@ -1,4 +1,8 @@
 # Python bytecode cache
 __pycache__/
 **/__pycache__/
+**/__pycache__/**
 *.py[cod]
+
+# pytest cache
+.pytest_cache/
