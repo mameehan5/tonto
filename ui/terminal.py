@@ -1,8 +1,7 @@
 from core.environment import CardGameEnv
 from core.actions import legal_actions_draw, legal_actions_discard, legal_actions_flip
 from core.cards import card_str
-from core.actions import get_drawn_cards, choose_action
-from core.actions import apply_discard_action, apply_flip_action
+from core.actions import view_drawn_cards
 
 def print_scores(env: CardGameEnv):
     print("\nScores after round", env.state.round_number)
@@ -23,6 +22,19 @@ def print_legal_actions(actions):
             desc += f" ({act.data})"
         print(f"{idx}: {desc}")
 
+def choose_action(actions):
+    choice = None
+    while choice is None:
+        try:
+            idx = int(input("Choose action index: "))
+            if 0 <= idx < len(actions):
+                choice = actions[idx]
+            else:
+                print("Invalid index")
+        except ValueError:
+            print("Enter a number")
+    return choice
+
 def run_terminal_game(env: CardGameEnv):
     print(80*"=")
     print("Game begins!")
@@ -31,7 +43,7 @@ def run_terminal_game(env: CardGameEnv):
     for _ in range(env.config.num_rounds):
         print(f'\nRound {env.state.round_number+1} ===============================')
 
-        for _ in range(env.config.cards_per_player):
+        for _ in range(env.config.cards_per_player + 1):
             for _ in range(env.config.num_players):
                 state = env.state
                 player = state.players[state.current_player]
@@ -60,7 +72,7 @@ def run_terminal_game(env: CardGameEnv):
                 actions = legal_actions_draw(env)
                 print_legal_actions(actions)
                 draw_action = choose_action(actions)
-                drawn_cards = get_drawn_cards(env, draw_action)
+                drawn_cards = view_drawn_cards(env, draw_action)
                 print("\nDrawn card(s):", " ".join(card_str(c) for c in drawn_cards))
 
                 # Discard
@@ -68,28 +80,25 @@ def run_terminal_game(env: CardGameEnv):
                 actions = legal_actions_discard(env, draw_action)
                 print_legal_actions(actions)
                 discard_action = choose_action(actions)
-                discarded_cards = apply_discard_action(env, drawn_cards, discard_action)
 
                 # Flip
                 print("\nFlip options:")
                 actions = legal_actions_flip(env, draw_action, discard_action)
                 print_legal_actions(actions)
-                choice = choose_action(actions)
-                apply_flip_action(env, choice)
+                flip_action = choose_action(actions)
 
-                # UPDATE 
-                if len(discarded_cards) > 1:
-                    # In the future, allow next player to order cards
-                    pass
 
-                # Display hand state
+                # Execute the composite action via the environment step (pass previewed drawn_cards)
+                obs, reward, done, info = env.step((draw_action, discard_action, flip_action))
+
+                # Display hand state from env for the acting player
                 print("Hand at end of turn:")
                 print_cards(player)
-                    
-                # Advance turn
-                env.advance_turn(discarded_cards)
+
+                # If multiple discarded cards were returned, future ordering not supported yet
+                # if info.get("round_ended"):
+                #     print("Round ended")
 
         # Advance round
         env.advance_round()
         print_scores(env)
-

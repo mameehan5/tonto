@@ -64,48 +64,43 @@ def legal_actions_flip(env, draw_action, discard_action) -> List[Action]:
     
     raise ValueError("Invalid combination of draw and discard actions")
 
-def choose_action(actions: List[Action]) -> Action:
-    choice = None
-    while choice is None:
-        try:
-            idx = int(input("Choose action index: "))
-            if 0 <= idx < len(actions):
-                choice = actions[idx]
-            else:
-                print("Invalid index")
-        except ValueError:
-            print("Enter a number")
-    return choice
 
-def get_drawn_cards(env, action: Action):
+def view_drawn_cards(env, action: Action):
     state = env.state
 
     if action.type == ActionType.DRAW_DECK:
-        cards = [state.draw_deck.pop()]
+        return [state.draw_deck[-1]]
     elif action.type == ActionType.PICKUP_DISCARD:
-        cards = [state.discard_pile.pop() for _ in range(action.data)]
+        return [state.discard_pile[-i] for i in range(action.data, 0, -1)]
     else:
         raise ValueError("Action is not a draw action")
-    return cards
 
 
+def apply_draw_action(env, action):
+    state = env.state
+
+    if action.type == ActionType.DRAW_DECK:
+        return [state.draw_deck.pop()]
+    elif action.type == ActionType.PICKUP_DISCARD:
+        return [state.discard_pile.pop() for _ in range(action.data)]
+    else:
+        raise ValueError("Action is not a valid draw action")
+    
 def apply_discard_action(env, drawn_cards, action):
     state = env.state
     player = state.players[state.current_player]
     
     if action.type == ActionType.DISCARD_DRAWN:
-        return drawn_cards
-    
+        discarded_cards = drawn_cards
     elif action.type == ActionType.DISCARD_OWN:
         # If we are discarding own cards, swap in drawn cards and only flip
         # action allowed is to flip those indices
         discarded_cards = [player.cards[index] for index in action.data]
         for i, index in enumerate(action.data):
             player.cards[index] = drawn_cards[i]
-        return discarded_cards
-
     else:
         raise ValueError("Action is not a valid discard action")
+    state.discard_pile.extend(discarded_cards)
 
 
 def apply_flip_action(env, action: Action):
