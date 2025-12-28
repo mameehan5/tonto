@@ -39,6 +39,7 @@ class CardGameEnv:
 
         Returns: (observation, reward, done, info)
         """
+        round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
         draw_action, discard_action, flip_action = actions
 
@@ -47,24 +48,18 @@ class CardGameEnv:
         apply_discard_action(self, drawn_cards, discard_action)
         apply_flip_action(self, flip_action)
 
-        # Advance turn with discarded cards
+        # Advance turn
         self.advance_turn()
 
         # If all players have all cards face up, end the round
-        round_ended = all(p.all_face_up() for p in self.state.players)
-        done = False
-        reward = compute_player_score(player, style='known')
+        round_state.complete = all(p.is_face_up_all() for p in self.player_state)
+        reward = -compute_player_score(player, style='known')
 
-        if round_ended:
-            # # Compute and record scores, then initialize next round
-            # self.advance_round()
-            # # Mark done when configured number of rounds completed
-            # if self.state.round_number >= self.config.num_rounds:
-            done = True
+        # info = {"round_ended": round_ended}
+        info = {}
 
-        info = {"round_ended": round_ended}
-
-        return self._get_observation(), reward, done, info
+        # return self._get_observation(), reward, round_state.complete, info
+        return None, reward, round_state.complete, info
 
     def initialize_game(self):
         self.game_state = GameState(
@@ -92,8 +87,9 @@ class CardGameEnv:
         self.game_state.current_player = (self.game_state.current_player + 1) % self.config.num_players
 
     def advance_round(self):
-        self.state.round_number += 1
-        for player in self.state.players:
+        for player in self.player_state:
             score = compute_player_score(player, style='flipped')
             player.individual_scores.append(score)
-        self.initialize_round()
+        self.game_state.round_number += 1
+        if self.game_state.round_number >= self.config.num_rounds:
+            self.game_state.complete = True

@@ -6,11 +6,13 @@ class GameState:
     def __init__(self, current_player: int, round_number: int):
         self.current_player = current_player
         self.round_number = round_number
+        self.complete = False
 
 class RoundState:
     def __init__(self, draw_deck: List[Card], discard_pile: List[Card]):
         self.draw_deck = draw_deck
         self.discard_pile = discard_pile
+        self.complete = False
     
     @property
     def num_discard_pile(self) -> int:
