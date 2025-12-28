@@ -46,6 +46,7 @@ class CardGameEnv:
 
         Returns: (observation, reward, done, info)
         """
+        player = self.state.players[self.state.current_player]
         draw_action, discard_action, flip_action = actions
 
         # Perform draw -> discard -> flip using core action helpers
@@ -59,7 +60,7 @@ class CardGameEnv:
         # If all players have all cards face up, end the round
         round_ended = all(p.all_face_up() for p in self.state.players)
         done = False
-        reward = 0.0
+        reward = compute_player_score(player, style='known')
 
         if round_ended:
             # # Compute and record scores, then initialize next round
@@ -68,7 +69,7 @@ class CardGameEnv:
             # if self.state.round_number >= self.config.num_rounds:
             done = True
 
-        info = {round_ended: round_ended}
+        info = {"round_ended": round_ended}
 
         return self._get_observation(), reward, done, info
 
@@ -110,6 +111,6 @@ class CardGameEnv:
     def advance_round(self):
         self.state.round_number += 1
         for player in self.state.players:
-            score = compute_player_score(player.cards)
+            score = compute_player_score(player, style='flipped')
             player.individual_scores.append(score)
         self.initialize_round()
