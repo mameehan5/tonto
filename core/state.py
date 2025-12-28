@@ -1,6 +1,5 @@
-from typing import List, Set
+from typing import List
 from core.cards import Card
-from core.phases import TurnPhase
 
 class PlayerState:
     def __init__(self, cards: List[Card]):
@@ -38,6 +37,5 @@ class GameState:
         self.draw_deck = draw_deck
         self.discard_pile = discard_pile
         self.current_player = current_player
-        # self.phase = phase
         self.round_number = round_number
         self.rng = rng

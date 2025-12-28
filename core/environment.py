@@ -1,19 +1,11 @@
 import random
 from core.cards import create_standard_deck
-from env.state import PlayerState, GameState
-from core.phases import TurnPhase
-from core.engine import apply_action
+from core.state import PlayerState, GameState
 from core.scoring import compute_player_score
 
 class CardGameEnv:
     def __init__(self, config):
         self.config = config
-        self.pending_draw = None
-        self.pending_source = None
-        self.pending_count = 0
-        self.just_flipped = []
-
-        # Initialize first round automatically
         self.initialize_game()
         self.initialize_players()
 
@@ -27,7 +19,6 @@ class CardGameEnv:
             draw_deck=deck,
             discard_pile=[deck.pop()],
             current_player=0,
-            # phase=TurnPhase.DRAW,
             round_number=0,
             rng=rng
         )
