@@ -1,25 +1,18 @@
 import random
+import numpy as np
 from typing import Tuple, List, Dict, Any, Optional
 
 from core.cards import create_standard_deck
-from core.state import PlayerState, GameState
+from core.state import GameState, RoundState, PlayerState 
 from core.scoring import compute_player_score
 from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
 
 class CardGameEnv:
-    def __init__(self, config):
+    def __init__(self, config, seed: int = 42):
         self.config = config
+        self.rng = random.Random(seed)
         self.initialize_game()
         self.initialize_players()
-
-    def reset(self, seed: int = None) -> Dict[str, Any]:
-        """Reset the environment. Returns an initial observation dict.
-
-        If `seed` is provided, it overrides `self.config.seed` for this reset.
-        """
-        self.initialize_game(seed=seed)
-        self.initialize_players()
-        return self._get_observation()
 
     def _get_observation(self) -> Dict[str, Any]:
         """Return a serializable observation of the current state."""
@@ -46,7 +39,7 @@ class CardGameEnv:
 
         Returns: (observation, reward, done, info)
         """
-        player = self.state.players[self.state.current_player]
+        player = self.player_state[self.game_state.current_player]
         draw_action, discard_action, flip_action = actions
 
         # Perform draw -> discard -> flip using core action helpers
@@ -73,40 +66,30 @@ class CardGameEnv:
 
         return self._get_observation(), reward, done, info
 
-    def initialize_game(self, seed: int = None):
-        seed_to_use = self.config.seed if seed is None else seed
-        rng = random.Random(seed_to_use)
-        deck = create_standard_deck(self.config.num_decks)
-        rng.shuffle(deck)
-
-        self.state = GameState(
-            players=[],
-            draw_deck=deck,
-            discard_pile=[deck.pop()],
+    def initialize_game(self):
+        self.game_state = GameState(
             current_player=0,
-            round_number=0,
-            rng=rng
+            round_number=0
         )
     
     def initialize_round(self):
-        self.state.current_player = self.state.round_number % self.config.num_players
-        self.state.draw_deck = create_standard_deck(self.config.num_decks)
-        self.state.rng.shuffle(self.state.draw_deck)
-        self.state.discard_pile = [self.state.draw_deck.pop()]
-        for player in self.state.players:
-            player.cards = [self.state.draw_deck.pop() for _ in range(self.config.cards_per_player)]
-            player.face_up = [False] * self.config.cards_per_player
-            player.private_seen = [True] * (self.config.cards_per_player // 2) + [False] * (self.config.cards_per_player // 2)
+        deck = create_standard_deck(self.config.num_decks)
+        self.rng.shuffle(deck)
+
+        self.round_state = RoundState(
+            draw_deck=deck,
+            discard_pile=[deck.pop()]
+        )
+        for player in self.player_state:
+            player.reset([self.round_state.draw_deck.pop() for _ in range(self.config.cards_per_player)])
     
     def initialize_players(self):
-        players = []
-        for _ in range(self.config.num_players):
-            hand = [self.state.draw_deck.pop() for _ in range(self.config.cards_per_player)]
-            players.append(PlayerState(hand))
-        self.state.players = players
+        self.player_state = [
+            PlayerState(i, self.config.cards_per_player) for i in range(self.config.num_players)
+        ]
 
     def advance_turn(self):
-        self.state.current_player = (self.state.current_player + 1) % self.config.num_players
+        self.game_state.current_player = (self.game_state.current_player + 1) % self.config.num_players
 
     def advance_round(self):
         self.state.round_number += 1

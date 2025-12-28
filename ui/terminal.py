@@ -41,26 +41,31 @@ def run_terminal_game(env: CardGameEnv):
     print(80*"=")
 
     for _ in range(env.config.num_rounds):
-        print(f'\nRound {env.state.round_number+1} ===============================')
+        print(f'\nRound {env.game_state.round_number+1} ===============================')
+
+        env.initialize_round()
+
+        # while not env.round_over:
 
         for _ in range(env.config.cards_per_player + 1):
             for _ in range(env.config.num_players):
-                state = env.state
-                player = state.players[state.current_player]
+                game_state = env.game_state
+                round_state = env.round_state
+                player = env.player_state[game_state.current_player]
 
                 # Skip player turn if all cards are flipped
-                if player.all_face_up():
-                    print(f"\nPlayer {state.current_player} | Phase: all cards flipped")
+                if player.is_face_up_all():
+                    print(f"\nPlayer {game_state.current_player} | Phase: all cards flipped")
                     env.advance_turn()
                     continue
 
                 # Play hand -------------------------------------------------------
-                print(f"\nPlayer {state.current_player} | Phase: DRAW")
+                print(f"\nPlayer {player.player_number} | Phase: DRAW")
 
                 # Display discard pile
-                num_discard = min(len(state.discard_pile), player.num_cards)
+                num_discard = min(len(round_state.discard_pile), player.num_cards)
                 assert num_discard >= 1
-                top_discards = state.discard_pile[-num_discard:]
+                top_discards = round_state.discard_pile[-num_discard:]
                 print("Top discard pile:", " ".join(card_str(c) for c in top_discards))
 
                 # Display player's cards
