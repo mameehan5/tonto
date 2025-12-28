@@ -17,17 +17,17 @@ class Action:
     data: Optional[int] = None
 
 def legal_actions_draw(env) -> List[Action]:
-    state = env.state
-    player = state.players[state.current_player]
+    game_state = env.game_state
+    round_state = env.round_state
+    player = env.player_state[game_state.current_player]
 
     actions = [Action(ActionType.DRAW_DECK)]
-    max_discard = min(len(state.discard_pile), player.count_not_face_up())
+    max_discard = min(round_state.num_discard_pile, player.num_face_down)
     actions.extend([Action(ActionType.PICKUP_DISCARD, i) for i in range(1, max_discard + 1)])
     return actions
 
 def legal_actions_discard(env, draw_action) -> List[Action]:
-    state = env.state
-    player = state.players[state.current_player]
+    player = env.player_state[env.game_state.current_player]
 
     # Get number of cards to discard
     num_discard = 1
@@ -48,8 +48,7 @@ def legal_actions_discard(env, draw_action) -> List[Action]:
     return actions
 
 def legal_actions_flip(env, draw_action, discard_action) -> List[Action]:
-    state = env.state
-    player = state.players[state.current_player]
+    player = env.player_state[env.game_state.current_player]
 
     if draw_action.type == ActionType.PICKUP_DISCARD:
         return [Action(ActionType.FLIP, discard_action.data)]
@@ -66,30 +65,30 @@ def legal_actions_flip(env, draw_action, discard_action) -> List[Action]:
 
 
 def view_drawn_cards(env, action: Action):
-    state = env.state
+    round_state = env.round_state
 
     if action.type == ActionType.DRAW_DECK:
-        return [state.draw_deck[-1]]
+        return [round_state.draw_deck[-1]]
     elif action.type == ActionType.PICKUP_DISCARD:
-        return [state.discard_pile[-i] for i in range(action.data, 0, -1)]
+        return [round_state.discard_pile[-i] for i in range(action.data, 0, -1)]
     else:
         raise ValueError("Action is not a draw action")
 
 
 def apply_draw_action(env, action):
-    state = env.state
+    round_state = env.round_state
 
     if action.type == ActionType.DRAW_DECK:
-        return [state.draw_deck.pop()]
+        return [round_state.draw_deck.pop()]
     elif action.type == ActionType.PICKUP_DISCARD:
-        return [state.discard_pile.pop() for _ in range(action.data)]
+        return [round_state.discard_pile.pop() for _ in range(action.data)]
     else:
         raise ValueError("Action is not a valid draw action")
     
 def apply_discard_action(env, drawn_cards, action):
-    state = env.state
-    player = state.players[state.current_player]
-    
+    round_state = env.round_state
+    player = env.player_state[env.game_state.current_player]
+
     if action.type == ActionType.DISCARD_DRAWN:
         discarded_cards = drawn_cards
     elif action.type == ActionType.DISCARD_OWN:
@@ -100,12 +99,11 @@ def apply_discard_action(env, drawn_cards, action):
             player.cards[index] = drawn_cards[i]
     else:
         raise ValueError("Action is not a valid discard action")
-    state.discard_pile.extend(discarded_cards)
+    round_state.discard_pile.extend(discarded_cards)
 
 
 def apply_flip_action(env, action: Action):
-    state = env.state
-    player = state.players[state.current_player]
+    player = env.player_state[env.game_state.current_player]
 
     assert action.type == ActionType.FLIP
 
