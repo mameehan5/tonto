@@ -6,8 +6,8 @@ from itertools import combinations
 
 from math import comb
 
-from core.cards import create_standard_deck, card_rank_idx
-from core.cards import encode_card, decode_card
+from core.cards import Card, create_standard_deck
+# from core.cards import encode_card, decode_card
 from core.state import GameState, RoundState, PlayerState 
 from core.scoring import compute_player_score
 from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
@@ -69,7 +69,7 @@ class CardGameEnv(gym.Env):
         for ip, player in enumerate(self.player_state):
             for ic, (c,up) in enumerate(zip(player.cards, player.face_up)):
                 if up is True:
-                    player_card_ranks[ip, ic, card_rank_idx(c)] = 1
+                    player_card_ranks[ip, ic, c.rank] = 1
                 else:
                     player_card_ranks[ip, ic, self.config.num_ranks] = 1  # face-down indicator
                 
@@ -77,7 +77,8 @@ class CardGameEnv(gym.Env):
         discarded_cards = np.full((num_cards), -1, dtype=np.int32)
         for i in range(num_cards):
             if i < len(self.round_state.discard_pile):
-                discarded_cards[-i] = encode_card(self.round_state.discard_pile[-i])
+                # discarded_cards[-i] = encode_card(self.round_state.discard_pile[-i])
+                discarded_cards[-i] = self.round_state.discard_pile[-i].id
         # discarded_cards[:len(self.round_state.discard_pile[-num_cards:])] = [card_to_int(c) for c in self.round_state.discard_pile[-num_cards:]]
 
         # Calculate unknown card size

@@ -1,6 +1,5 @@
 from core.environment import CardGameEnv
 from core.actions import legal_actions_draw, legal_actions_discard, legal_actions_flip
-from core.cards import card_str
 from core.actions import view_drawn_cards
 
 def print_scores(env: CardGameEnv):
@@ -11,7 +10,7 @@ def print_scores(env: CardGameEnv):
 def print_cards(player):
     for i, c in enumerate(player.cards):
         visible = player.is_face_up(i) or player.is_privately_seen(i)
-        display = card_str(c) if visible else "🂠"
+        display = c.card_str if visible else "🂠"
         flipped_mark = " (flipped)" if player.is_face_up(i) else ""
         print(f"{i}: {display}{flipped_mark}")
 
@@ -53,7 +52,7 @@ def play_turn(env: CardGameEnv):
     num_discard = min(len(round_state.discard_pile), player.num_cards)
     assert num_discard >= 1
     top_discards = round_state.discard_pile[-num_discard:]
-    print("\nTop discard pile:", " ".join(card_str(c) for c in top_discards))
+    print("\nTop discard pile:", " ".join(c.card_str for c in top_discards))
 
     # Display player's cards
     print("Your cards:")
@@ -65,13 +64,16 @@ def play_turn(env: CardGameEnv):
     print_legal_actions(actions)
     draw_action = choose_action(actions)
     drawn_cards = view_drawn_cards(env, draw_action)
-    print("\nDrawn card(s):", " ".join(card_str(c) for c in drawn_cards))
+    print("\nDrawn card(s):", " ".join(c.card_str for c in drawn_cards))
 
     # Discard
-    print("\nDiscard options:")
     actions = legal_actions_discard(env, draw_action)
-    print_legal_actions(actions)
-    discard_action = choose_action(actions)
+    if len(actions) == 1:
+        discard_action = actions[0]
+    else:
+        print("\nDiscard options:")
+        print_legal_actions(actions)
+        discard_action = choose_action(actions)
 
     # Flip
     actions = legal_actions_flip(env, draw_action, discard_action)
@@ -86,8 +88,7 @@ def play_turn(env: CardGameEnv):
     action_int = env.encode_actions((draw_action, discard_action, flip_action))
 
     # Execute the composite action via the environment step (pass previewed drawn_cards)
-    # obs, reward, done, info = env.step((draw_action, discard_action, flip_action))
-    obs, reward, done, info = env.step(action_int)
+    obs, reward, done, err, info = env.step(action_int)
 
     # Display hand state from env for the acting player
     print("\nHand at end of turn:")
