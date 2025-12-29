@@ -2,6 +2,8 @@ from enum import Enum, auto
 from dataclasses import dataclass
 from typing import Optional, List
 
+import numpy as np
+
 from itertools import combinations
 
 class ActionType(Enum):
@@ -17,14 +19,9 @@ class Action:
     data: Optional[int] = None
 
 def legal_actions_draw(env) -> List[Action]:
-    game_state = env.game_state
-    round_state = env.round_state
-    player = env.player_state[game_state.current_player]
-
-    actions = [Action(ActionType.DRAW_DECK)]
-    max_discard = min(round_state.discard_count, player.num_face_down)
-    actions.extend([Action(ActionType.PICKUP_DISCARD, i) for i in range(1, max_discard + 1)])
-    return actions
+    return [Action(ActionType.DRAW_DECK)] + [
+        Action(ActionType.PICKUP_DISCARD, i) for i in range(1, env.max_discard() + 1)
+    ]
 
 def legal_actions_discard(env, draw_action) -> List[Action]:
     player = env.player_state[env.game_state.current_player]
@@ -35,11 +32,10 @@ def legal_actions_discard(env, draw_action) -> List[Action]:
         num_discard = draw_action.data
 
     # Gather possible discard actions from own hand
-    indices = [i for i, ic in enumerate(player.face_up) if not ic]
-    assert len(indices) > 0
-    actions = [
-        Action(ActionType.DISCARD_OWN, list(combo)) for combo in combinations(indices, num_discard)
-    ]
+    actions = []
+    for combo in combinations(np.arange(player.num_cards), num_discard):
+        if all(player.is_face_down(i) for i in combo):
+            actions.append(Action(ActionType.DISCARD_OWN, list(combo)))
 
     # If drawn from deck, can discard drawn card directly
     if draw_action.type == ActionType.DRAW_DECK:
@@ -63,7 +59,6 @@ def legal_actions_flip(env, draw_action, discard_action) -> List[Action]:
     
     raise ValueError("Invalid combination of draw and discard actions")
 
-
 def view_drawn_cards(env, action: Action):
     round_state = env.round_state
 
@@ -74,8 +69,7 @@ def view_drawn_cards(env, action: Action):
     else:
         raise ValueError("Action is not a draw action")
 
-
-def apply_draw_action(env, action):
+def apply_draw_action(env, action: Action) -> List:
     round_state = env.round_state
 
     if action.type == ActionType.DRAW_DECK:
@@ -84,8 +78,8 @@ def apply_draw_action(env, action):
         return [round_state.discard_pile.pop() for _ in range(action.data)]
     else:
         raise ValueError("Action is not a valid draw action")
-    
-def apply_discard_action(env, drawn_cards, action):
+
+def apply_discard_action(env, drawn_cards: List, action: Action):
     round_state = env.round_state
     player = env.player_state[env.game_state.current_player]
 

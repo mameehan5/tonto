@@ -42,6 +42,9 @@ class PlayerState:
 
     def is_face_up(self, idx: int) -> bool:
         return self.face_up[idx]
+    
+    def is_face_down(self, idx: int) -> bool:
+        return not self.face_up[idx]
 
     def is_face_up_all(self) -> bool:
         return all(self.face_up)

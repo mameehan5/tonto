@@ -1,18 +1,27 @@
-import random
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from typing import Tuple, List, Dict, Any, Optional
+from itertools import combinations
+
+from math import comb
 
 from core.cards import create_standard_deck, card_to_int
 from core.state import GameState, RoundState, PlayerState 
 from core.scoring import compute_player_score
 from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
+from core.actions import ActionType, Action
 
-class CardGameEnv:
+class CardGameEnv(gym.Env):
     def __init__(self, config, seed: int = 42):
         self.config = config
-        self.reset(seed)
+        self.reset(seed=seed)
+
+        # Check if encode/decode are consistent inverses
+        for action_int in range(self.config.num_possible_actions):
+            actions = self.decode_action(action_int)
+            reencoded = self.encode_actions(actions)
+            assert action_int == reencoded, f"Action encoding/decoding mismatch: {action_int} -> {actions} -> {reencoded}"
 
         max_card_index = self.config.num_decks * 52 - 1
         self.observation_space = spaces.Dict({
@@ -24,8 +33,8 @@ class CardGameEnv:
             ),
             "unknown_card_size": spaces.Box(
                 low=0, 
-                high=max_card_index,
-                shape=(), 
+                high=max_card_index+1,
+                shape=(1,), 
                 dtype=np.int32
             ),
             "discarded_cards": spaces.Box(
@@ -37,9 +46,23 @@ class CardGameEnv:
             "current_player": spaces.Discrete(
                 self.config.num_players
             ),
+            # Need to add legal actions mask
+            # Need to add top of card pile
+            # Need to add mask based on legal actions if draw card is known
+        })
+        self.action_space = spaces.Dict({
+            "draw_action": spaces.Discrete(
+                1 + self.config.cards_per_player
+            ), 
+            "discard_action": spaces.Discrete(
+                1 + self.config.cards_per_player
+            ),
+            "flip_action": spaces.Discrete(
+                self.config.cards_per_player
+            ),
         })
 
-    def _get_observation(self) -> Dict[str, Any]:
+    def _get_obs(self) -> Dict[str, Any]:
         """Return a gym-compatible observation that matches self.observation_space."""
         # allocate arrays with expected shapes/dtypes from the configured space
         num_players = self.config.num_players
@@ -68,19 +91,47 @@ class CardGameEnv:
 
         return {
             "player_cards": player_cards,
-            "unknown_card_size": np.int32(unknown_card_size),
+            "unknown_card_size": np.array([unknown_card_size], dtype=np.int32),
             "discarded_cards": discarded_cards,
             "current_player": int(self.game_state.current_player),
         }
     
-    def step(self, actions: Tuple) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
-        """Apply a composite action (draw_action, discard_action, flip_action).
+    def _get_info(self):
+        return {}
+    
+    def _get_legal_actions_mask(self):
+        """Return an array of legal actions for the current player."""
+        legal_actions = np.zeros(self.config.num_possible_actions, dtype=np.int8)
+
+        player = self.player_state[self.game_state.current_player]
+        num_cards = self.config.cards_per_player
+
+        # Available actions after drawing from deck
+        for icard in range(num_cards):
+            if player.is_face_down(icard):
+                legal_actions[icard] = 1
+                legal_actions[icard + num_cards] = 1
+        
+        # Available actions after picking up from discard pile
+        idx = 2 * num_cards
+        for n in range(1, self.max_discard() + 1):
+            for combo in combinations(np.arange(num_cards), n):
+                if all(player.is_face_down(i) for i in combo):
+                    legal_actions[idx] = 1
+                idx += 1
+
+        return legal_actions
+    
+    def step(self, action_int: int) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
+        """Apply an action (draw_action, discard_action, flip_action).
 
         Returns: (observation, reward, done, info)
         """
         round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
-        draw_action, discard_action, flip_action = actions
+
+        # Decode action int into component actions
+        draw_action, discard_action, flip_action = self.decode_action(action_int)
 
         # Perform draw -> discard -> flip using core action helpers
         drawn_cards = apply_draw_action(self, draw_action)
@@ -97,15 +148,16 @@ class CardGameEnv:
         # info = {"round_ended": round_ended}
         info = {}
 
-        return self._get_observation(), reward, round_state.complete, info
+        return self._get_obs(), reward, round_state.complete, info
 
-    def reset(self, seed: Optional[int] = None) -> Dict[str, Any]:
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
-        self.rng = random.Random(seed)
+        # self.rng = random.Random(seed)
+        super().reset(seed=seed)
         self.initialize_game()
         self.initialize_players()
         self.initialize_round()
-        return self._get_observation()
+        return (self._get_obs(), {})
 
     def initialize_game(self):
         self.game_state = GameState(
@@ -115,7 +167,7 @@ class CardGameEnv:
     
     def initialize_round(self):
         deck = create_standard_deck(self.config.num_decks)
-        self.rng.shuffle(deck)
+        np.random.shuffle(deck)
 
         self.round_state = RoundState(
             draw_deck=deck,
@@ -139,3 +191,57 @@ class CardGameEnv:
         self.game_state.round_number += 1
         if self.game_state.round_number >= self.config.num_rounds:
             self.game_state.complete = True
+    
+    def max_discard(self) -> int:
+        player = self.player_state[self.game_state.current_player]
+        return min(self.round_state.discard_count, player.num_face_down)
+
+    def encode_actions(
+        self, actions: Tuple[Action, Action, Action]
+    ) -> int:
+        draw_action, discard_action, flip_action = actions
+
+        player = self.player_state[self.game_state.current_player]
+        num_cards = player.num_cards
+
+        if draw_action.type == ActionType.DRAW_DECK:
+            draw_action_int = 0
+            if discard_action.type == ActionType.DISCARD_DRAWN:
+                discard_action_int = 0
+            elif discard_action.type == ActionType.DISCARD_OWN:
+                discard_action_int = num_cards
+            flip_action_int = flip_action.data[0]
+        elif draw_action.type == ActionType.PICKUP_DISCARD:
+            draw_action_int = 2 * num_cards
+            idx = 0
+            for n in range(1, num_cards + 1):
+                for combo in combinations(np.arange(num_cards), n):
+                    if discard_action.data == list(combo):
+                        discard_action_int = idx
+                    idx += 1
+            flip_action_int = 0
+        return draw_action_int + discard_action_int + flip_action_int
+    
+    def decode_action(self, action_int: int) -> Tuple[Action, Action, Action]:
+        player = self.player_state[self.game_state.current_player]
+        num_cards = player.num_cards
+
+        if action_int < 2 * num_cards:
+            draw_action = Action(ActionType.DRAW_DECK)
+            if action_int < num_cards:
+                discard_action = Action(ActionType.DISCARD_DRAWN)
+                flip_action = Action(ActionType.FLIP, [action_int])
+            else:
+                discard_action = Action(ActionType.DISCARD_OWN, [action_int - num_cards])
+                flip_action = Action(ActionType.FLIP, [action_int - num_cards])
+        else:
+            idx = 2 * num_cards
+            for n in range(1, num_cards + 1):
+                for combo in combinations(np.arange(num_cards), n):
+                    if action_int == idx:
+                        draw_action = Action(ActionType.PICKUP_DISCARD, n)
+                        discard_action = Action(ActionType.DISCARD_OWN, list(combo))
+                        flip_action = Action(ActionType.FLIP, list(combo))
+                    idx += 1
+
+        return (draw_action, discard_action, flip_action)

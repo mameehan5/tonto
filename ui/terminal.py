@@ -74,17 +74,23 @@ def play_turn(env: CardGameEnv):
     discard_action = choose_action(actions)
 
     # Flip
-    print("\nFlip options:")
     actions = legal_actions_flip(env, draw_action, discard_action)
-    print_legal_actions(actions)
-    flip_action = choose_action(actions)
+    if len(actions) == 1:
+        flip_action = actions[0]
+    else:
+        print("\nFlip options:")
+        print_legal_actions(actions)
+        flip_action = choose_action(actions)
 
+    # Map actionss to int for environment step
+    action_int = env.encode_actions((draw_action, discard_action, flip_action))
 
     # Execute the composite action via the environment step (pass previewed drawn_cards)
-    obs, reward, done, info = env.step((draw_action, discard_action, flip_action))
+    # obs, reward, done, info = env.step((draw_action, discard_action, flip_action))
+    obs, reward, done, info = env.step(action_int)
 
     # Display hand state from env for the acting player
-    print("Hand at end of turn:")
+    print("\nHand at end of turn:")
     print_cards(player)
 
 def run_terminal_game(env: CardGameEnv):
@@ -104,6 +110,6 @@ def run_terminal_game(env: CardGameEnv):
         env.advance_round()
         print_scores(env)
 
-    print(80*"=")
-    print("\nGame over! All rounds completed.")
+    print("\n" + 80*"=")
+    print("Game over! All rounds completed.")
     print(80*"=")
