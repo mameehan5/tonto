@@ -6,6 +6,9 @@ SUITS = ["S","H","D","C"]
 
 Card = Tuple[str, str, int]  # (rank, suit, deck)
 
+# TODO: make Card a dataclass?
+# TODO: add Joker handling?
+
 def create_standard_deck(num_decks: int = 1) -> List[Card]:
     deck: List[Card] = []
     for deck_ind in range(num_decks):
@@ -34,10 +37,25 @@ def card_value(card: Card) -> int:
         return 0
     return int(rank)
 
-def card_to_int(card) -> int:
-    """Map a Card object to an int in [0..51]. Return -1 for None/unknown.
-    Tries common card attrs: rank (1..13) and suit (0..3 or 'hearts' etc.)."""
+def card_rank(card: Card) -> str:
+    rank, _, _ = card
+    return rank
+
+def card_rank_idx(card: Card) -> int:
+    rank, _, _ = card
+    return RANKS.index(rank)
+
+def encode_card(card) -> int:
     rank, suit, deck = card
     irank = RANKS.index(rank)
     isuit = SUITS.index(suit)
     return deck * 52 + isuit * 13 + irank
+
+def decode_card(card_int: int) -> Card:
+    deck = card_int // 52
+    rem = card_int % 52
+    isuit = rem // 13
+    irank = rem % 13
+    rank = RANKS[irank]
+    suit = SUITS[isuit]
+    return (rank, suit, deck)

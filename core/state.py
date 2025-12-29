@@ -27,6 +27,8 @@ class PlayerState:
     face_up: List[bool] = field(init=False, repr=False)
     private_seen: List[bool] = field(init=False, repr=False)
 
+    # TODO: rename face up to flipped
+
     def __post_init__(self):
         self.reset()
 

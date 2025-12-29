@@ -1,27 +1,21 @@
 from core.config import GameConfig
-from core.environment import CardGameEnv
-import numpy as np
 
-cfg = GameConfig(num_players=2, num_decks=1, cards_per_player=4, num_rounds=1)
-env = CardGameEnv(cfg)
+import gymnasium as gym
+from gymnasium.envs.registration import register
+from gymnasium.utils.env_checker import check_env as _check_env
 
-obs = env.reset()
-assert isinstance(obs, dict), "reset() must return a dict-like observation"
-
-# basic observation_space containment check
-if not env.observation_space.contains(obs):
-    raise AssertionError("Observation does not match observation_space")
-
-# try full gym/gymnasium checker if available and action_space is defined
-try:
-    from gymnasium.utils.env_checker import check_env as _check_env  # gymnasium
-except Exception:
-    try:
-        from gym.utils.env_checker import check_env as _check_env  # gym
-    except Exception:
-        _check_env = None
+register(id="TontoCardGameTest", entry_point="core.environment:CardGameEnv")
+cfg = GameConfig(num_players=4, num_decks=2, cards_per_player=8, num_rounds=4)
+env = gym.make("TontoCardGameTest", config=cfg)
 
 if hasattr(env, "action_space") and _check_env is not None:
-    _check_env(env)  # may raise on incompatibilities
-
-print("Environment passed basic observation checks.")
+    # run checks against the raw environment to avoid wrapper interference
+    try:
+        raw = env.unwrapped
+    except Exception:
+        raw = env
+    # ensure a minimal spec so the checker can test render modes
+    if getattr(raw, "spec", None) is None:
+        from types import SimpleNamespace
+        raw.spec = SimpleNamespace(id="TontoCardGame-v0")
+    _check_env(raw)

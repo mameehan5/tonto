@@ -18,3 +18,10 @@ class GameConfig:
         self.num_possible_actions = 2 * self.cards_per_player
         for n in range(1, self.cards_per_player + 1):
             self.num_possible_actions += comb(self.cards_per_player, n)
+        
+        # Calculate total number of cards
+        self.total_cards = self.num_decks * 52
+        self.max_card_index = self.total_cards - 1
+
+        self.num_ranks = 13
+        self.num_suits = 4

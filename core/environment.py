@@ -6,7 +6,8 @@ from itertools import combinations
 
 from math import comb
 
-from core.cards import create_standard_deck, card_to_int
+from core.cards import create_standard_deck, card_rank_idx
+from core.cards import encode_card, decode_card
 from core.state import GameState, RoundState, PlayerState 
 from core.scoring import compute_player_score
 from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
@@ -23,65 +24,60 @@ class CardGameEnv(gym.Env):
             reencoded = self.encode_actions(actions)
             assert action_int == reencoded, f"Action encoding/decoding mismatch: {action_int} -> {actions} -> {reencoded}"
 
-        max_card_index = self.config.num_decks * 52 - 1
         self.observation_space = spaces.Dict({
-            "player_cards": spaces.Box(
-                low=-1, 
-                high=max_card_index,
-                shape=(self.config.num_players, self.config.cards_per_player),
-                dtype=np.int32
+            "player_card_ranks": spaces.MultiBinary(
+                (
+                    self.config.num_players, 
+                    self.config.cards_per_player, 
+                    self.config.num_ranks + 1 # +1 for face-down indicator
+                )
             ),
-            "unknown_card_size": spaces.Box(
-                low=0, 
-                high=max_card_index+1,
-                shape=(1,), 
-                dtype=np.int32
-            ),
-            "discarded_cards": spaces.Box(
-                low=-1, 
-                high=max_card_index, 
-                shape=(self.config.cards_per_player,), 
-                dtype=np.int32
-            ),
-            "current_player": spaces.Discrete(
-                self.config.num_players
-            ),
-            # Need to add legal actions mask
+            # "unknown_card_size": spaces.Box(
+            #     low=0, 
+            #     high=self.config.total_cards,
+            #     shape=(1,), 
+            #     dtype=np.int32
+            # ),
+            # "discarded_cards": spaces.MultiBinary(
+            #     (
+            #         self.config.cards_per_player, 
+            #         self.config.total_cards
+            #     )
+            # ),
+            # "current_player": spaces.Discrete(
+            #     self.config.num_players
+            # ),
+            # "legal_actions_mask": spaces.MultiBinary(
+            #     (self.config.num_possible_actions,)
+            # ),
             # Need to add top of card pile
             # Need to add mask based on legal actions if draw card is known
         })
-        self.action_space = spaces.Dict({
-            "draw_action": spaces.Discrete(
-                1 + self.config.cards_per_player
-            ), 
-            "discard_action": spaces.Discrete(
-                1 + self.config.cards_per_player
-            ),
-            "flip_action": spaces.Discrete(
-                self.config.cards_per_player
-            ),
-        })
+        self.action_space = spaces.Discrete(self.config.num_possible_actions)
 
     def _get_obs(self) -> Dict[str, Any]:
         """Return a gym-compatible observation that matches self.observation_space."""
         # allocate arrays with expected shapes/dtypes from the configured space
         num_players = self.config.num_players
         num_cards = self.config.cards_per_player
+        num_ranks = self.config.num_ranks
 
         # face_up = np.zeros((num_players, num_cards), dtype=np.int8)
 
-        # Set player cards
-        player_cards = np.full((num_players, num_cards), -1, dtype=np.int32)
+        # Player card ranks
+        player_card_ranks = np.zeros((num_players, num_cards, num_ranks + 1), dtype=np.int8)
         for ip, player in enumerate(self.player_state):
             for ic, (c,up) in enumerate(zip(player.cards, player.face_up)):
-                if up:
-                    player_cards[ip, ic] = card_to_int(c)
-        
+                if up is True:
+                    player_card_ranks[ip, ic, card_rank_idx(c)] = 1
+                else:
+                    player_card_ranks[ip, ic, self.config.num_ranks] = 1  # face-down indicator
+                
         # Set discarded cards
         discarded_cards = np.full((num_cards), -1, dtype=np.int32)
         for i in range(num_cards):
             if i < len(self.round_state.discard_pile):
-                discarded_cards[-i] = card_to_int(self.round_state.discard_pile[-i])
+                discarded_cards[-i] = encode_card(self.round_state.discard_pile[-i])
         # discarded_cards[:len(self.round_state.discard_pile[-num_cards:])] = [card_to_int(c) for c in self.round_state.discard_pile[-num_cards:]]
 
         # Calculate unknown card size
@@ -90,10 +86,10 @@ class CardGameEnv(gym.Env):
             unknown_card_size += player.num_face_down
 
         return {
-            "player_cards": player_cards,
-            "unknown_card_size": np.array([unknown_card_size], dtype=np.int32),
-            "discarded_cards": discarded_cards,
-            "current_player": int(self.game_state.current_player),
+            "player_card_ranks": player_card_ranks,
+            # "unknown_card_size": np.array([unknown_card_size], dtype=np.int32),
+            # "discarded_cards": discarded_cards,
+            # "current_player": int(self.game_state.current_player),
         }
     
     def _get_info(self):
@@ -121,17 +117,32 @@ class CardGameEnv(gym.Env):
                 idx += 1
 
         return legal_actions
+
+    def _legal_action(self, action_int: int) -> bool:
+        legal_actions_mask = self._get_legal_actions_mask()
+        return bool(legal_actions_mask[action_int] == 1)
     
     def step(self, action_int: int) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
         """Apply an action (draw_action, discard_action, flip_action).
 
         Returns: (observation, reward, done, info)
         """
+
         round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
 
         # Decode action int into component actions
         draw_action, discard_action, flip_action = self.decode_action(action_int)
+
+        # Check legality of action
+        if self._legal_action(action_int) is False:
+            info = {
+                'error': f"Illegal action {action_int} for player {self.game_state.current_player}",
+                'draw_action': draw_action,
+                'discard_action': discard_action,
+                'flip_action': flip_action
+            }
+            return self._get_obs(), -1.0, round_state.complete, True, info
 
         # Perform draw -> discard -> flip using core action helpers
         drawn_cards = apply_draw_action(self, draw_action)
@@ -148,7 +159,7 @@ class CardGameEnv(gym.Env):
         # info = {"round_ended": round_ended}
         info = {}
 
-        return self._get_obs(), reward, round_state.complete, info
+        return self._get_obs(), reward, round_state.complete, False, info
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
@@ -167,7 +178,7 @@ class CardGameEnv(gym.Env):
     
     def initialize_round(self):
         deck = create_standard_deck(self.config.num_decks)
-        np.random.shuffle(deck)
+        self.np_random.shuffle(deck)
 
         self.round_state = RoundState(
             draw_deck=deck,
