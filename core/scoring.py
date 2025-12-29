@@ -43,10 +43,10 @@ def calculate_rank_score(rank, count):
 
 def compute_player_score(player, style='flipped'):
     if style == 'flipped':
-        card_counts_flipped = Counter(rank for (rank, _), up in zip(player.cards, player.face_up) if up)
+        card_counts_flipped = Counter(rank for (rank, _, _), up in zip(player.cards, player.face_up) if up)
         score = sum(calculate_rank_score(rank, count) for rank, count in card_counts_flipped.items())
     elif style == 'known':
-        card_counts_known = Counter(rank for (rank, _), up, seen in zip(player.cards, player.face_up, player.private_seen) if up or seen)
+        card_counts_known = Counter(rank for (rank, _, _), up, seen in zip(player.cards, player.face_up, player.private_seen) if up or seen)
         score = sum(calculate_rank_score(rank, count) for rank, count in card_counts_known.items())
     else:
         raise ValueError(f'Unknown scoring style: {style}')
