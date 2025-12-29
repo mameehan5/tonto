@@ -1,8 +1,10 @@
 import random
 import numpy as np
+import gymnasium as gym
+from gymnasium import spaces
 from typing import Tuple, List, Dict, Any, Optional
 
-from core.cards import create_standard_deck
+from core.cards import create_standard_deck, card_to_int
 from core.state import GameState, RoundState, PlayerState 
 from core.scoring import compute_player_score
 from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
@@ -11,31 +13,66 @@ class CardGameEnv:
     def __init__(self, config, seed: int = 42):
         self.config = config
         self.reset(seed)
-        self.rng = random.Random(seed)
-        self.initialize_game()
-        self.initialize_players()
-        self.initialize_round()
+
+        max_card_index = self.config.num_decks * 52 - 1
+        self.observation_space = spaces.Dict({
+            "player_cards": spaces.Box(
+                low=-1, 
+                high=max_card_index,
+                shape=(self.config.num_players, self.config.cards_per_player),
+                dtype=np.int32
+            ),
+            "unknown_card_size": spaces.Box(
+                low=0, 
+                high=max_card_index,
+                shape=(), 
+                dtype=np.int32
+            ),
+            "discarded_cards": spaces.Box(
+                low=-1, 
+                high=max_card_index, 
+                shape=(self.config.cards_per_player,), 
+                dtype=np.int32
+            ),
+            "current_player": spaces.Discrete(
+                self.config.num_players
+            ),
+        })
 
     def _get_observation(self) -> Dict[str, Any]:
-        """Return a serializable observation of the current state."""
-        state = self.state
-        obs_players = []
-        for p in state.players:
-            obs_players.append({
-                "cards": list(p.cards),
-                "face_up": list(p.face_up),
-                "private_seen": list(p.private_seen),
-                "individual_scores": list(p.individual_scores),
-            })
+        """Return a gym-compatible observation that matches self.observation_space."""
+        # allocate arrays with expected shapes/dtypes from the configured space
+        num_players = self.config.num_players
+        num_cards = self.config.cards_per_player
+
+        # face_up = np.zeros((num_players, num_cards), dtype=np.int8)
+
+        # Set player cards
+        player_cards = np.full((num_players, num_cards), -1, dtype=np.int32)
+        for ip, player in enumerate(self.player_state):
+            for ic, (c,up) in enumerate(zip(player.cards, player.face_up)):
+                if up:
+                    player_cards[ip, ic] = card_to_int(c)
+        
+        # Set discarded cards
+        discarded_cards = np.full((num_cards), -1, dtype=np.int32)
+        for i in range(num_cards):
+            if i < len(self.round_state.discard_pile):
+                discarded_cards[-i] = card_to_int(self.round_state.discard_pile[-i])
+        # discarded_cards[:len(self.round_state.discard_pile[-num_cards:])] = [card_to_int(c) for c in self.round_state.discard_pile[-num_cards:]]
+
+        # Calculate unknown card size
+        unknown_card_size = len(self.round_state.draw_deck)
+        for player in self.player_state:
+            unknown_card_size += player.num_face_down
 
         return {
-            "current_player": state.current_player,
-            "round_number": state.round_number,
-            "draw_deck_size": len(state.draw_deck),
-            "discard_pile": state.discard_pile,
-            "players": obs_players,
+            "player_cards": player_cards,
+            "unknown_card_size": np.int32(unknown_card_size),
+            "discarded_cards": discarded_cards,
+            "current_player": int(self.game_state.current_player),
         }
-
+    
     def step(self, actions: Tuple) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
         """Apply a composite action (draw_action, discard_action, flip_action).
 
@@ -60,8 +97,7 @@ class CardGameEnv:
         # info = {"round_ended": round_ended}
         info = {}
 
-        # return self._get_observation(), reward, round_state.complete, info
-        return None, reward, round_state.complete, info
+        return self._get_observation(), reward, round_state.complete, info
 
     def reset(self, seed: Optional[int] = None) -> Dict[str, Any]:
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
@@ -69,7 +105,7 @@ class CardGameEnv:
         self.initialize_game()
         self.initialize_players()
         self.initialize_round()
-        # return self._get_observation()
+        return self._get_observation()
 
     def initialize_game(self):
         self.game_state = GameState(
