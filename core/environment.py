@@ -10,9 +10,11 @@ from core.actions import apply_draw_action, apply_discard_action, apply_flip_act
 class CardGameEnv:
     def __init__(self, config, seed: int = 42):
         self.config = config
+        self.reset(seed)
         self.rng = random.Random(seed)
         self.initialize_game()
         self.initialize_players()
+        self.initialize_round()
 
     def _get_observation(self) -> Dict[str, Any]:
         """Return a serializable observation of the current state."""
@@ -60,6 +62,14 @@ class CardGameEnv:
 
         # return self._get_observation(), reward, round_state.complete, info
         return None, reward, round_state.complete, info
+
+    def reset(self, seed: Optional[int] = None) -> Dict[str, Any]:
+        """Reinitialize the environment. If seed is provided, reseed RNGs."""
+        self.rng = random.Random(seed)
+        self.initialize_game()
+        self.initialize_players()
+        self.initialize_round()
+        # return self._get_observation()
 
     def initialize_game(self):
         self.game_state = GameState(

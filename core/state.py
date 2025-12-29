@@ -1,43 +1,49 @@
+from dataclasses import dataclass, field
 from typing import List, Optional
-import numpy as np
 from core.cards import Card
 
+@dataclass
 class GameState:
-    def __init__(self, current_player: int, round_number: int):
-        self.current_player = current_player
-        self.round_number = round_number
-        self.complete = False
+    current_player: int
+    round_number: int
+    complete: bool = False
 
+@dataclass
 class RoundState:
-    def __init__(self, draw_deck: List[Card], discard_pile: List[Card]):
-        self.draw_deck = draw_deck
-        self.discard_pile = discard_pile
-        self.complete = False
-    
+    draw_deck: List[Card] = field(default_factory=list)
+    discard_pile: List[Card] = field(default_factory=list)
+    complete: bool = False
+
     @property
-    def num_discard_pile(self) -> int:
+    def discard_count(self) -> int:
         return len(self.discard_pile)
 
+@dataclass
 class PlayerState:
-    def __init__(self, player_number: int, num_cards: int):
-        self.player_number = player_number
-        self.num_cards = num_cards
-        self.individual_scores: List[int] = []
+    player_number: int
+    num_cards: int
+    individual_scores: List[int] = field(default_factory=list)
+    _cards: List[Optional[Card]] = field(init=False, repr=False)
+    face_up: List[bool] = field(init=False, repr=False)
+    private_seen: List[bool] = field(init=False, repr=False)
+
+    def __post_init__(self):
         self.reset()
 
     @property
-    def cards(self):
+    def cards(self) -> List[Optional[Card]]:
         return self._cards
-    
+
     @cards.setter
-    def cards(self, cards: List[Card]):
-        assert len(cards) == self.num_cards
+    def cards(self, cards: List[Optional[Card]]):
+        if len(cards) != self.num_cards:
+            raise ValueError(f"Expected {self.num_cards} cards, got {len(cards)}")
         self._cards = cards
 
     def is_face_up(self, idx: int) -> bool:
         return self.face_up[idx]
-    
-    def is_face_up_all(self):
+
+    def is_face_up_all(self) -> bool:
         return all(self.face_up)
 
     def is_privately_seen(self, idx: int) -> bool:
@@ -48,18 +54,19 @@ class PlayerState:
         return sum(1 for up in self.face_up if not up)
 
     def flip(self, idx: int):
-        if self.face_up[idx] is True:
+        if self.face_up[idx]:
             raise ValueError(f'Card index {idx} is already flipped up')
         self.face_up[idx] = True
 
-    def reset(self, cards: Optional[List[Card]] = None):
+    def reset(self, cards: Optional[List[Optional[Card]]] = None):
         if cards is None:
             self.cards = [None] * self.num_cards
         else:
             self.cards = cards
-        self.face_up = np.array([False] * self.num_cards)
-        self.private_seen = np.array([True] * (self.num_cards // 2) + [False] * (self.num_cards // 2))
-    
+        self.face_up = [False] * self.num_cards
+        half = self.num_cards // 2
+        self.private_seen = [True] * half + [False] * half
+
     @property
     def score(self) -> int:
         return sum(self.individual_scores)

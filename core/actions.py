@@ -22,7 +22,7 @@ def legal_actions_draw(env) -> List[Action]:
     player = env.player_state[game_state.current_player]
 
     actions = [Action(ActionType.DRAW_DECK)]
-    max_discard = min(round_state.num_discard_pile, player.num_face_down)
+    max_discard = min(round_state.discard_count, player.num_face_down)
     actions.extend([Action(ActionType.PICKUP_DISCARD, i) for i in range(1, max_discard + 1)])
     return actions
 
