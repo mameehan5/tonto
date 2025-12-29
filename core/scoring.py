@@ -10,43 +10,39 @@ def compute_player_score(player, style='flipped'):
     return sum(calculate_rank_score(rank, count) for rank, count in card_counts.items())
 
 def calculate_rank_score(rank, count):
-    score = 0
-    
-    # Jokers
-    if rank == "JOKER":
-        return score  # Jokers are neutral once called
+    assert 0 <= rank <= 12
+    assert count >= 1
 
     # Kings
-    if rank == 'K':
-        # singles & pairs of kings are 0
+    if rank == 12:
+        if count == 1 or count == 2:
+            return 0
         if count == 3:
-            score -= 10
+            return -10
         elif count >= 4:
-            score -= 5 * count
-        return score
+            return -5 * count
 
-    # Fives (special handling)
-    if rank == '5':
-        score -= 5 * count
-        return score
+    # Fives
+    if rank == 4:
+        return -5 * count
 
     # Face value
-    if rank in ('J', 'Q'):
+    if rank in [10,11]:
         face_value = 10
-    elif rank == 'A':
+    elif rank == 0:
         face_value = 1
     else:
-        face_value = int(rank)
+        face_value = int(rank + 1)
 
     # General grouping rules
     if count == 1:
-        score += face_value
+        return face_value
     elif count == 2:
-        score += 0
+        return 0
     elif count == 3:
-        score -= face_value
+        return -face_value
     elif count >= 4:
-        score -= 5 * count
+        return -5 * count
 
-    return score
+    raise RuntimeError(f'No score determined. Rank: {rank}. Count: {count}')
 
