@@ -29,7 +29,7 @@ class CardGameEnv(gym.Env):
             "player_card_ranks": spaces.MultiBinary(
                 (
                     self.config.num_players, 
-                    self.config.cards_per_player, 
+                    self.config.num_cards, 
                     self.config.num_ranks + 1 # +1 for face-down indicator
                 )
             ),
@@ -42,18 +42,21 @@ class CardGameEnv(gym.Env):
             # TODO: this may be better to track counts of card ranks of unflipped
             "num_unflipped_cards": spaces.Box(
                 low=0, 
-                high=self.config.total_cards,
+                high=self.config.num_total_cards,
                 shape=(1,), 
                 dtype=np.int32, 
             ),
             "discarded_cards": spaces.MultiBinary(
                 (
-                    self.config.cards_per_player, 
+                    self.config.num_cards, 
                     self.config.num_ranks + 1 # +1 for empty slots
                 )
             ),
             "current_player": spaces.Discrete(
                 self.config.num_players
+            ),
+            "num_cards_per_player_half": spaces.Discrete(
+                self.config.max_num_cards // 2
             ),
             "legal_actions_mask": spaces.MultiBinary(
                 (
@@ -68,7 +71,7 @@ class CardGameEnv(gym.Env):
         """Return a gym-compatible observation that matches self.observation_space."""
 
         num_players = self.config.num_players
-        num_cards = self.config.cards_per_player
+        num_cards = self.config.num_cards
         num_ranks = self.config.num_ranks
 
         # Player card ranks
@@ -106,6 +109,7 @@ class CardGameEnv(gym.Env):
             "num_unflipped_cards": np.array([num_unflipped_cards], dtype=np.int32), 
             "discarded_cards": discarded_cards, 
             "current_player": self.game_state.current_player,
+            "num_cards_per_player_half": self.round_state.cards_per_player // 2,
             "legal_actions_mask": self._get_legal_actions_mask()
         }
     
@@ -117,7 +121,7 @@ class CardGameEnv(gym.Env):
         legal_actions = np.zeros(self.config.num_possible_actions, dtype=np.int8)
 
         player = self.player_state[self.game_state.current_player]
-        num_cards = self.config.cards_per_player
+        num_cards = self.config.num_cards
 
         # If all cards are flipped, we must pass
         if player.is_face_up_all():
@@ -176,9 +180,6 @@ class CardGameEnv(gym.Env):
         # Advance turn
         self.advance_turn()
         
-        # If all players have all cards face up, end the round
-        round_state.complete = all(p.is_face_up_all() for p in self.player_state)
-
         return self._get_obs(), reward, round_state.complete, False, self._get_info()
 
     def apply_action(self, action_int: int):
@@ -191,7 +192,6 @@ class CardGameEnv(gym.Env):
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
-        # self.rng = random.Random(seed)
         super().reset(seed=seed)
         self.initialize_game()
         self.initialize_players()
@@ -213,11 +213,11 @@ class CardGameEnv(gym.Env):
             discard_pile=[deck.pop()]
         )
         for player in self.player_state:
-            player.reset([self.round_state.draw_deck.pop() for _ in range(self.config.cards_per_player)])
+            player.reset([self.round_state.draw_deck.pop() for _ in range(self.config.num_cards)])
     
     def initialize_players(self):
         self.player_state = [
-            PlayerState(i, self.config.cards_per_player) for i in range(self.config.num_players)
+            PlayerState(i, self.config.num_cards) for i in range(self.config.num_players)
         ]
 
     def advance_round(self):
@@ -230,6 +230,7 @@ class CardGameEnv(gym.Env):
     
     def advance_turn(self):
         self.game_state.current_player = (self.game_state.current_player + 1) % self.config.num_players
+        self.round_state.complete = all(p.is_face_up_all() for p in self.player_state)
 
     def max_discard(self) -> int:
         player = self.player_state[self.game_state.current_player]

@@ -74,6 +74,8 @@ def legal_actions_flip(env, draw_action, discard_action) -> List[Action]:
 def view_drawn_cards(env, action: Action):
     round_state = env.round_state
 
+    if action.type == ActionType.PASS:
+        return []
     if action.type == ActionType.DRAW_DECK:
         return [round_state.draw_deck[-1]]
     elif action.type == ActionType.PICKUP_DISCARD:

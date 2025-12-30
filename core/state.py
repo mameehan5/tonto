@@ -12,6 +12,7 @@ class GameState:
 class RoundState:
     draw_deck: List[Card] = field(default_factory=list)
     discard_pile: List[Card] = field(default_factory=list)
+    cards_per_player: int = 0
     complete: bool = False
 
     @property
