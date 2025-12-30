@@ -7,6 +7,7 @@ import numpy as np
 from itertools import combinations
 
 class ActionType(Enum):
+    PASS = -1
     DRAW_DECK = 0
     PICKUP_DISCARD = 1
     DISCARD_OWN = 2
@@ -19,12 +20,20 @@ class Action:
     data: Optional[int] = None
 
 def legal_actions_draw(env) -> List[Action]:
-    return [Action(ActionType.DRAW_DECK)] + [
-        Action(ActionType.PICKUP_DISCARD, i) for i in range(1, env.max_discard() + 1)
-    ]
+    player = env.player_state[env.game_state.current_player]
+    if player.is_face_up_all():
+        return [Action(ActionType.PASS)]
+    else:
+        return [Action(ActionType.DRAW_DECK)] + [
+            Action(ActionType.PICKUP_DISCARD, i) for i in range(1, env.max_discard() + 1)
+        ]
 
 def legal_actions_discard(env, draw_action) -> List[Action]:
     player = env.player_state[env.game_state.current_player]
+
+    # No available actions allowed
+    if draw_action.type == ActionType.PASS:
+        return []
 
     # Get number of cards to discard
     num_discard = 1
@@ -46,7 +55,10 @@ def legal_actions_discard(env, draw_action) -> List[Action]:
 def legal_actions_flip(env, draw_action, discard_action) -> List[Action]:
     player = env.player_state[env.game_state.current_player]
 
-    if draw_action.type == ActionType.PICKUP_DISCARD:
+    if draw_action.type == ActionType.PASS:
+        return []
+
+    elif draw_action.type == ActionType.PICKUP_DISCARD:
         return [Action(ActionType.FLIP, discard_action.data)]
 
     elif discard_action.type == ActionType.DISCARD_OWN:
@@ -72,6 +84,8 @@ def view_drawn_cards(env, action: Action):
 def apply_draw_action(env, action: Action) -> List:
     round_state = env.round_state
 
+    if action.type == ActionType.PASS:
+        return []
     if action.type == ActionType.DRAW_DECK:
         return [round_state.draw_deck.pop()]
     elif action.type == ActionType.PICKUP_DISCARD:

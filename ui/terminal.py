@@ -22,6 +22,13 @@ def print_legal_actions(actions):
         print(f"{idx}: {desc}")
 
 def choose_action(actions):
+    # Potential quick returns with user input
+    if len(actions) == 0:
+        return None
+    elif len(actions) == 1:
+        return actions[0]
+    
+    # Get user input
     choice = None
     while choice is None:
         try:
@@ -38,12 +45,6 @@ def play_turn(env: CardGameEnv):
     game_state = env.game_state
     round_state = env.round_state
     player = env.player_state[game_state.current_player]
-
-    # Skip player turn if all cards are flipped
-    if player.is_face_up_all():
-        print(f"\nPlayer {game_state.current_player} | Phase: all cards flipped")
-        env.advance_turn()
-        return
 
     # Play hand -------------------------------------------------------
     print(f"\nPlayer {player.player_number}")
@@ -68,21 +69,15 @@ def play_turn(env: CardGameEnv):
 
     # Discard
     actions = legal_actions_discard(env, draw_action)
-    if len(actions) == 1:
-        discard_action = actions[0]
-    else:
-        print("\nDiscard options:")
-        print_legal_actions(actions)
-        discard_action = choose_action(actions)
+    print("\nDiscard options:")
+    print_legal_actions(actions)
+    discard_action = choose_action(actions)
 
     # Flip
     actions = legal_actions_flip(env, draw_action, discard_action)
-    if len(actions) == 1:
-        flip_action = actions[0]
-    else:
-        print("\nFlip options:")
-        print_legal_actions(actions)
-        flip_action = choose_action(actions)
+    print("\nFlip options:")
+    print_legal_actions(actions)
+    flip_action = choose_action(actions)
 
     # Map actionss to int for environment step
     action_int = env.encode_actions((draw_action, discard_action, flip_action))

@@ -14,7 +14,7 @@ class GameConfig:
         object.__setattr__(
             self, 
             'num_possible_actions', 
-            2 * self.cards_per_player + sum(
+            1 + 2 * self.cards_per_player + sum(
                 comb(self.cards_per_player, n) for n in range(1, self.cards_per_player + 1)
             )
         )

@@ -118,14 +118,18 @@ class CardGameEnv(gym.Env):
         player = self.player_state[self.game_state.current_player]
         num_cards = self.config.cards_per_player
 
+        # If all cards are flipped, we must pass
+        if player.is_face_up_all():
+            legal_actions[0] = 1
+
         # Available actions after drawing from deck
         for icard in range(num_cards):
             if player.is_face_down(icard):
-                legal_actions[icard] = 1
-                legal_actions[icard + num_cards] = 1
+                legal_actions[icard + 1] = 1
+                legal_actions[icard + num_cards + 1] = 1
         
         # Available actions after picking up from discard pile
-        idx = 2 * num_cards
+        idx = 2 * num_cards + 1
         for n in range(1, self.max_discard() + 1):
             for combo in combinations(np.arange(num_cards), n):
                 if all(player.is_face_down(i) for i in combo):
@@ -159,25 +163,23 @@ class CardGameEnv(gym.Env):
             }
             return self._get_obs(), -1.0, round_state.complete, True, info
 
-        # Calculate best and worst possible hand using available legal actions
-        
+        # Calculate best and worst possible outcome using available legal actions
+
 
         # Perform draw -> discard -> flip using core action helpers
         drawn_cards = apply_draw_action(self, draw_action)
-        apply_discard_action(self, drawn_cards, discard_action)
-        apply_flip_action(self, flip_action)
+        if len(drawn_cards) > 0:
+            apply_discard_action(self, drawn_cards, discard_action)
+            apply_flip_action(self, flip_action)
 
         # Advance turn
         self.advance_turn()
-
+        
         # If all players have all cards face up, end the round
         round_state.complete = all(p.is_face_up_all() for p in self.player_state)
         reward = -compute_player_score(player, style='known')
 
-        # info = {"round_ended": round_ended}
-        info = {}
-
-        return self._get_obs(), reward, round_state.complete, False, info
+        return self._get_obs(), reward, round_state.complete, False, self._get_info()
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
@@ -186,7 +188,7 @@ class CardGameEnv(gym.Env):
         self.initialize_game()
         self.initialize_players()
         self.initialize_round()
-        return (self._get_obs(), {})
+        return (self._get_obs(), self._get_info())
 
     def initialize_game(self):
         self.game_state = GameState(
@@ -210,9 +212,6 @@ class CardGameEnv(gym.Env):
             PlayerState(i, self.config.cards_per_player) for i in range(self.config.num_players)
         ]
 
-    def advance_turn(self):
-        self.game_state.current_player = (self.game_state.current_player + 1) % self.config.num_players
-
     def advance_round(self):
         for player in self.player_state:
             score = compute_player_score(player, style='flipped')
@@ -221,9 +220,16 @@ class CardGameEnv(gym.Env):
         if self.game_state.round_number >= self.config.num_rounds:
             self.game_state.complete = True
     
+    def advance_turn(self):
+        self.game_state.current_player = (self.game_state.current_player + 1) % self.config.num_players
+
     def max_discard(self) -> int:
         player = self.player_state[self.game_state.current_player]
         return min(self.round_state.discard_count, player.num_face_down)
+
+    # def best_possible_outcome()
+
+    # def worst_possible_outcome()
 
     def encode_actions(
         self, actions: Tuple[Action, Action, Action]
@@ -233,15 +239,19 @@ class CardGameEnv(gym.Env):
         player = self.player_state[self.game_state.current_player]
         num_cards = player.num_cards
 
-        if draw_action.type == ActionType.DRAW_DECK:
+        if draw_action.type == ActionType.PASS:
             draw_action_int = 0
+            discard_action_int = 0
+            flip_action_int = 0
+        elif draw_action.type == ActionType.DRAW_DECK:
+            draw_action_int = 1
             if discard_action.type == ActionType.DISCARD_DRAWN:
                 discard_action_int = 0
             elif discard_action.type == ActionType.DISCARD_OWN:
                 discard_action_int = num_cards
             flip_action_int = flip_action.data[0]
         elif draw_action.type == ActionType.PICKUP_DISCARD:
-            draw_action_int = 2 * num_cards
+            draw_action_int = 2 * num_cards + 1
             idx = 0
             for n in range(1, num_cards + 1):
                 for combo in combinations(np.arange(num_cards), n):
@@ -251,20 +261,24 @@ class CardGameEnv(gym.Env):
             flip_action_int = 0
         return draw_action_int + discard_action_int + flip_action_int
     
-    def decode_action(self, action_int: int) -> Tuple[Action, Action, Action]:
+    def decode_action(self, action_int: int) -> Tuple[Action, Any, Any]:
         player = self.player_state[self.game_state.current_player]
         num_cards = player.num_cards
 
-        if action_int < 2 * num_cards:
+        if action_int == 0:
+            draw_action = Action(ActionType.PASS)
+            discard_action = None
+            flip_action = None
+        elif action_int < 2 * num_cards + 1:
             draw_action = Action(ActionType.DRAW_DECK)
-            if action_int < num_cards:
+            if action_int < num_cards + 1:
                 discard_action = Action(ActionType.DISCARD_DRAWN)
-                flip_action = Action(ActionType.FLIP, [action_int])
+                flip_action = Action(ActionType.FLIP, [action_int - 1])
             else:
-                discard_action = Action(ActionType.DISCARD_OWN, [action_int - num_cards])
-                flip_action = Action(ActionType.FLIP, [action_int - num_cards])
+                discard_action = Action(ActionType.DISCARD_OWN, [action_int - num_cards - 1])
+                flip_action = Action(ActionType.FLIP, [action_int - num_cards - 1])
         else:
-            idx = 2 * num_cards
+            idx = 2 * num_cards + 1
             for n in range(1, num_cards + 1):
                 for combo in combinations(np.arange(num_cards), n):
                     if action_int == idx:
