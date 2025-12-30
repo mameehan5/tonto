@@ -5,7 +5,7 @@ from core.config import GameConfig
 
 # Create our training environment
 register(id="TontoTestEnv", entry_point="core.environment:CardGameEnv")
-cfg = GameConfig(num_players=8, num_decks=3, cards_per_player=8, num_rounds=1)
+cfg = GameConfig(num_players=4, num_decks=3, cards_per_player=8, num_rounds=1)
 env = gym.make("TontoTestEnv", config=cfg)
 
 # Reset environment to start a new episode

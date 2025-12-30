@@ -79,11 +79,13 @@ def play_turn(env: CardGameEnv):
     print_legal_actions(actions)
     flip_action = choose_action(actions)
 
-    # Map actionss to int for environment step
+    # Map actions to int for environment step
     action_int = env.encode_actions((draw_action, discard_action, flip_action))
 
     # Execute the composite action via the environment step (pass previewed drawn_cards)
-    obs, reward, done, err, info = env.step(action_int)
+    # obs, reward, done, err, info = env.step(action_int)
+    env.apply_action(action_int)
+    env.advance_turn()
 
     # Display hand state from env for the acting player
     print("\nHand at end of turn:")

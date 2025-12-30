@@ -5,6 +5,7 @@ from typing import Tuple, List, Dict, Any, Optional
 from itertools import combinations
 
 from math import comb
+import copy
 
 from core.cards import Card, create_standard_deck
 # from core.cards import encode_card, decode_card
@@ -150,11 +151,9 @@ class CardGameEnv(gym.Env):
         round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
 
-        # Decode action int into component actions
-        draw_action, discard_action, flip_action = self.decode_action(action_int)
-
         # Check legality of action
         if self._legal_action(action_int) is False:
+            draw_action, discard_action, flip_action = self.decode_action(action_int)
             info = {
                 'error': f"Illegal action {action_int} for player {self.game_state.current_player}",
                 'draw_action': draw_action,
@@ -164,22 +163,31 @@ class CardGameEnv(gym.Env):
             return self._get_obs(), -1.0, round_state.complete, True, info
 
         # Calculate best and worst possible outcome using available legal actions
+        best, worst = self.possible_scores_extrema()
 
+        # Apply action
+        self.apply_action(action_int)
 
-        # Perform draw -> discard -> flip using core action helpers
-        drawn_cards = apply_draw_action(self, draw_action)
-        if len(drawn_cards) > 0:
-            apply_discard_action(self, drawn_cards, discard_action)
-            apply_flip_action(self, flip_action)
+        # Compute reward based on score compared to best and worst possibilities
+        score = compute_player_score(player, style='known')
+        reward = self.compute_reward(score, best, worst)
+        # reward = 1.0
 
         # Advance turn
         self.advance_turn()
         
         # If all players have all cards face up, end the round
         round_state.complete = all(p.is_face_up_all() for p in self.player_state)
-        reward = -compute_player_score(player, style='known')
 
         return self._get_obs(), reward, round_state.complete, False, self._get_info()
+
+    def apply_action(self, action_int: int):
+        # Perform draw -> discard -> flip using core action helpers
+        draw_action, discard_action, flip_action = self.decode_action(action_int)
+        drawn_cards = apply_draw_action(self, draw_action)
+        if len(drawn_cards) > 0:
+            apply_discard_action(self, drawn_cards, discard_action)
+            apply_flip_action(self, flip_action)
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
@@ -227,9 +235,27 @@ class CardGameEnv(gym.Env):
         player = self.player_state[self.game_state.current_player]
         return min(self.round_state.discard_count, player.num_face_down)
 
-    # def best_possible_outcome()
+    def possible_scores_extrema(self):
+        best = self.config.max_possible_score
+        worst = self.config.min_possible_score
+        legal_actions_mask = np.array(self._get_legal_actions_mask(), dtype=bool)
+        for action_int, legal in enumerate(legal_actions_mask):
+            env_tmp = copy.deepcopy(self)
+            if legal == 0:
+                continue
 
-    # def worst_possible_outcome()
+            env_tmp.apply_action(action_int)
+            score = compute_player_score(env_tmp.player_state[env_tmp.game_state.current_player])
+            best = min(score, best) 
+            worst = max(score, worst)
+        return best, worst
+
+    def compute_reward(self, score, best, worst):
+        if score == best:
+            return 1.0
+        elif score == worst:
+            return 0.0
+        return (score - worst)/(best - worst)
 
     def encode_actions(
         self, actions: Tuple[Action, Action, Action]
