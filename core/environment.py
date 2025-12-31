@@ -8,7 +8,6 @@ from math import comb
 import copy
 
 from core.cards import Card, create_standard_deck
-# from core.cards import encode_card, decode_card
 from core.state import GameState, RoundState, PlayerState 
 from core.scoring import compute_player_score
 from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
@@ -67,7 +66,7 @@ class CardGameEnv(gym.Env):
         })
         self.action_space = spaces.Discrete(self.config.num_possible_actions)
 
-    def _get_obs(self) -> Dict[str, Any]:
+    def _get_obs(self):
         """Return a gym-compatible observation that matches self.observation_space."""
 
         num_players = self.config.num_players
@@ -114,7 +113,7 @@ class CardGameEnv(gym.Env):
         }
     
     def _get_info(self):
-        return {}
+        return {"legal_actions_mask": self._get_legal_actions_mask()}
     
     def _get_legal_actions_mask(self):
         """Return an array of legal actions for the current player."""
@@ -246,7 +245,7 @@ class CardGameEnv(gym.Env):
                 continue
 
             env_tmp.apply_action(action_int)
-            score = compute_player_score(env_tmp.player_state[env_tmp.game_state.current_player])
+            score = compute_player_score(env_tmp.player_state[env_tmp.game_state.current_player], style='known')
             best = min(score, best) 
             worst = max(score, worst)
         return best, worst
@@ -256,7 +255,14 @@ class CardGameEnv(gym.Env):
             return 1.0
         elif score == worst:
             return 0.0
-        return (score - worst)/(best - worst)
+        reward = (score - worst)/(best - worst)
+        assert 0.0 <= reward <= 1.0
+        return reward
+
+    def compute_player_scores(self, assert_flipped=False):
+        return [
+            compute_player_score(p, style='flipped', assert_flipped=assert_flipped) for p in self.player_state
+        ]
 
     def encode_actions(
         self, actions: Tuple[Action, Action, Action]

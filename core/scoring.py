@@ -1,7 +1,9 @@
 from collections import Counter
 
-def compute_player_score(player, style='flipped'):
+def compute_player_score(player, style='flipped', assert_flipped=False):
     if style == 'flipped':
+        if assert_flipped is True:
+            assert player.is_face_up_all()
         card_counts = Counter(c.rank for c, up in zip(player.cards, player.face_up) if up)
     elif style == 'known':
         card_counts = Counter(c.rank for c, up, seen in zip(player.cards, player.face_up, player.private_seen) if up or seen)
@@ -44,5 +46,5 @@ def calculate_rank_score(rank, count):
     elif count >= 4:
         return -5 * count
 
-    raise RuntimeError(f'No score determined. Rank: {rank}. Count: {count}')
+    raise ValueError(f'No score determined. Rank: {rank}. Count: {count}')
 
