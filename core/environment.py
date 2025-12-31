@@ -1,6 +1,7 @@
 import random
 import numpy as np
 from typing import Tuple, List, Dict, Any, Optional
+import pygame
 
 from core.cards import create_standard_deck
 from core.state import GameState, RoundState, PlayerState 
@@ -66,6 +67,7 @@ class CardGameEnv:
             current_player=0,
             round_number=0
         )
+        
     
     def initialize_round(self):
         deck = create_standard_deck(self.config.num_decks)
@@ -75,6 +77,8 @@ class CardGameEnv:
             draw_deck=deck,
             discard_pile=[deck.pop()]
         )
+        #this is where they get the top card (above) and the player's initial card's (below), but I need to figure out where
+        #its being printed and replace that with my draw card
         for player in self.player_state:
             player.reset([self.round_state.draw_deck.pop() for _ in range(self.config.cards_per_player)])
     

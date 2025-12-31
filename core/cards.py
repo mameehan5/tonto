@@ -4,6 +4,7 @@ SUITS = ["♠", "♥", "♦", "♣"]
 RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
 
 Card = Tuple[str, str]  # (rank, suit)
+#I need to draw a card based on this "card" data structure
 
 def create_standard_deck(num_decks: int = 1) -> List[Card]:
     deck: List[Card] = []
@@ -13,6 +14,7 @@ def create_standard_deck(num_decks: int = 1) -> List[Card]:
                 deck.append((rank, suit))
         # deck.append(("JOKER",""))
         # deck.append(("JOKER",""))
+    #I want to use create 52 instances of card_display here as well. Or maybe I can just draw it based on the tuple data
     return deck
 
 def card_str(card: Card) -> str:

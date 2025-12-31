@@ -4,6 +4,7 @@ from typing import Optional, List
 
 from itertools import combinations
 
+#This is the index of each action in the terminal
 class ActionType(Enum):
     DRAW_DECK = 0
     PICKUP_DISCARD = 1
