@@ -7,6 +7,8 @@ from sb3_contrib.ppo_mask import MaskablePPO
 from sb3_contrib.common.maskable.callbacks import MaskableEvalCallback
 from sb3_contrib.common.maskable.evaluation import evaluate_policy
 
+from sb3_contrib.common.wrappers import ActionMasker
+
 # Import the Tonto environment and config
 from env.environment import TontoEnv
 
@@ -20,26 +22,42 @@ def make_env_fn(num_players, num_cards, num_decks, num_rounds, seed=None):
             num_cards=num_cards, 
             seed=seed
         )
-        return env
+        return ActionMasker(env, lambda e: e.action_masks())
     return _init
 
 def main(args):
     # Create a vectorized environment (parallel instances for faster data collection)
     # We use MaskablePPO, which supports vectorized envs with built-in masks.
+    # vec_env = make_vec_env(
+    #     env_id=lambda: TontoEnv(
+    #         num_players=args.num_players, 
+    #         num_decks=args.num_decks, 
+    #         num_rounds=args.num_rounds, 
+    #         num_cards=args.num_cards, 
+    #         seed=args.seed
+    #     ), 
+    #     n_envs=args.num_envs
+    # )
+    env_fn = make_env_fn(
+        num_players=args.num_players,
+        num_cards=args.num_cards,
+        num_decks=args.num_decks,
+        num_rounds=args.num_rounds,
+        seed=args.seed,
+    )
     vec_env = make_vec_env(
-        env_id=lambda: TontoEnv(
-            num_players=args.num_players, 
-            num_decks=args.num_decks, 
-            num_rounds=args.num_rounds, 
-            num_cards=args.num_cards, 
-            seed=args.seed
-        ), 
+        env_id=env_fn,
         n_envs=args.num_envs
     )
+
+    from sb3_contrib.common.maskable.utils import get_action_masks
+    masks = get_action_masks(vec_env)
+    assert masks is not None
 
     # Configure PPO with MlpPolicy and optional GPU usage
     model = MaskablePPO(
         "MultiInputPolicy", 
+        # "MlpPolicy", 
         vec_env,
         verbose=1,
         n_steps=args.n_steps,

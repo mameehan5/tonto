@@ -4,6 +4,7 @@ from game.cards import Card
 from game.phases import Phase
 
 import numpy as np
+import copy
 
 from collections import Counter
 
@@ -121,9 +122,30 @@ class PlayerState:
 
     @property
     def known_score(self) -> int:
-        cards = self.cards + self.holding_cards
+        cards = copy.deepcopy(self.cards + self.holding_cards)
         known = self.face_up & self.private_seen
         known = np.concatenate([known, np.ones_like(self.holding_cards, dtype=bool)])
+        if any(c.rank == -1 for c in cards if c is not None):
+            # Identify jokers
+            jokers = np.zeros((13), dtype=bool)
+            for i,card in enumerate(cards):
+                jokers[i] = True
+
+            # Assign joker best possible rank
+            for i,(card,joke) in enumerate(zip(cards,jokers)):
+                if joke:
+                    card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
+                    best = sum(rank_score(rank, count) for rank, count in card_counts.items())
+                    best_rank = -1
+                    for r in range(13):
+                        card.rank = r
+                        card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
+                        score = min(best, sum(rank_score(rank, count) for rank, count in card_counts.items()))
+                        if score <= best:
+                            best_rank = r
+                            best = score
+                    card.rank = best_rank
+
         card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
         return sum(rank_score(rank, count) for rank, count in card_counts.items())
 
