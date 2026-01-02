@@ -78,4 +78,7 @@ def compute_action_mask(env):
     elif phase == Phase.DECLARE_JOKER:
         mask[Action.DECLARE_JOKER_0 : Action.DECLARE_JOKER_0 + NUM_RANKS] = True
 
+    elif phase == Phase.END:
+        mask[Action.END_TURN] = True
+
     return mask

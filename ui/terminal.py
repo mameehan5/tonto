@@ -9,8 +9,6 @@ import numpy as np
 import argparse
 
 from env.environment import TontoEnv
-# from core.actions import legal_actions_draw, legal_actions_discard, legal_actions_flip
-# from core.actions import view_drawn_cards
 
 from game.actions import compute_action_mask, decode_action
 
@@ -176,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_players", type=int, default=2)
     parser.add_argument("--num_cards", type=int, default=4)
     parser.add_argument("--num_decks", type=int, default=1)
-    parser.add_argument("--num_rounds", type=int, default=1)
+    parser.add_argument("--num_rounds", type=int, default=2)
     parser.add_argument("--seed", type=int, default=1)
 
     # parser.add_argument(
