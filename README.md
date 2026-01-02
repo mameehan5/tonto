@@ -23,8 +23,8 @@ This repository contains a Python-based implementation of a custom multiplayer c
 ## Game Setup
 
 - **Players:** 2–12  
-- **Decks:** 1–3 standard decks (52 cards + 2 jokers each)  
-- **Cards per player:** 4–12 (same for all players per round)  
+- **Decks:** 1–4 standard decks (52 cards + 2 jokers each)  
+- **Cards per player:** 2–20 (same for all players per round)  
 - **Rounds per game:** 1–10  
 - Lead player proposes the game configuration (number of decks, cards, and rounds), and all other players agree.
 
@@ -54,14 +54,14 @@ Players continue until **all cards in all hands are face-up**.
 ## Card Values
 
 | Card                | Value                       |
-|--------------------|-----------------------------|
+|---------------------|-----------------------------|
 | Ace                 | 1                           |
 | 2–10                | Face value                  |
 | 5                   | -5 (per single 5)           |
 | Jack, Queen         | 10                          |
 | King                | 0                           |
-| Two of same card    | 0 (except two 5s = -10)    |
-| Three of same card  | -face value (3 Jacks = -10)|
+| Two of same card    | 0 (except two 5s = -10)     |
+| Three of same card  | -face value (3 Jacks = -10) |
 | Four of a kind      | -20                         |
 | Five or more same   | -5 × number of identical    |
 | Jokers              | Wildcard (must be called)   |

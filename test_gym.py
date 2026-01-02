@@ -5,7 +5,7 @@ from gymnasium.envs.registration import register
 from gymnasium.utils.env_checker import check_env as _check_env
 
 register(id="TontoTestEnv", entry_point="core.environment:CardGameEnv")
-cfg = GameConfig(num_players=4, num_decks=2, cards_per_player=8, num_rounds=4)
+cfg = GameConfig(num_players=4, num_decks=2, num_rounds=4, num_cards=8)
 env = gym.make("TontoTestEnv", config=cfg)
 
 if hasattr(env, "action_space") and _check_env is not None:

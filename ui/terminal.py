@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
+import numpy as np
 
 import argparse
 
@@ -11,12 +12,12 @@ from env.environment import TontoEnv
 # from core.actions import legal_actions_draw, legal_actions_discard, legal_actions_flip
 # from core.actions import view_drawn_cards
 
-from rl.actions import compute_action_mask, decode_action
+from game.actions import compute_action_mask, decode_action
 
 def print_scores(env: TontoEnv):
-    print("\nScores after round", env.game_state.round_number)
+    print("\nScores after round", env.game_state.current_round)
     for i, player in enumerate(env.player_state):
-        print(f"Player {i}: Individual scores: {player.individual_scores} | Total score: {player.score}")
+        print(f"Player {i}: Individual scores: {player.individual_scores} | Total score: {player.total_score}")
 
 def print_cards(player):
     for i, c in enumerate(player.cards):
@@ -108,22 +109,19 @@ def play_turn(env: TontoEnv):
         flip_action = choose_action(actions)
         env.step(flip_action)
     
-    # Need to check to call jokers here
-
-    # Map actions to int for environment step
-    # action_int = env.encode_actions((draw_action, discard_action, flip_action))
-
-    # Execute the composite action via the environment step (pass previewed drawn_cards)
-    # obs, reward, done, err, info = env.step(action_int)
-    # env.apply_action(action_int)
+    # Declare joker(s)
+    while np.any(player.visible_undeclared_jokers):
+        print("\nDeclare joker:")
+        actions = print_legal_actions(env)
+        call_action = choose_action(actions)
+        env.step(call_action)
+    
+    # Advance turn
     env.advance_turn()
 
     # Display hand state from env for the acting player
     print("\nHand at end of turn:")
     print_cards(player)
-
-
-
 
 # def run_terminal_game(env, controllers, ppo_model=None, log_level="basic"):
 
@@ -158,13 +156,13 @@ def run_terminal_game(env: TontoEnv):
     while not env.game_state.complete:
         print(f'\nRound {env.game_state.current_round+1} ===============================')
 
-        env.initialize_round()
+        # env.initialize_round()
 
         while not env.round_state.complete:
             play_turn(env)
 
         # Advance round
-        # env.advance_round()
+        env.advance_round()
         print_scores(env)
 
     print("\n" + 80*"=")
@@ -179,6 +177,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_cards", type=int, default=4)
     parser.add_argument("--num_decks", type=int, default=1)
     parser.add_argument("--num_rounds", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=1)
 
     # parser.add_argument(
     #     "--human_players",
@@ -202,7 +201,7 @@ if __name__ == '__main__':
         num_decks=args.num_decks, 
         num_rounds=args.num_rounds, 
         num_cards=args.num_cards,
-        seed=42
+        seed=args.seed
     )
 
     # ppo_model = None

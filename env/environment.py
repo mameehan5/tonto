@@ -2,17 +2,11 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from typing import Tuple, List, Dict, Any, Optional
-from itertools import combinations
-
-from math import comb
-import copy
 
 from game.cards import create_standard_deck
-from game.state import GameState, RoundState, PlayerState 
-from game.scoring import compute_player_score
-from core.actions import apply_draw_action, apply_discard_action, apply_flip_action
-from rl.actions import Action, compute_action_mask, decode_action
-
+from game.state import GameState, RoundState, PlayerState
+from game.actions import Action, compute_action_mask, decode_action
+from game.phases import Phase
 
 
 class TontoEnv(gym.Env):
@@ -154,7 +148,7 @@ class TontoEnv(gym.Env):
         return {
             "hand_ranks": hand_ranks, 
             "face_up": face_up, 
-            "seed": seen
+            "seen": seen
             # "player_card_ranks": player_card_ranks,
             # "player_known_scores": player_known_scores, 
             # # "num_unflipped_cards": np.array([num_unflipped_cards], dtype=np.int32), 
@@ -168,33 +162,6 @@ class TontoEnv(gym.Env):
         # return {"legal_actions_mask": self._get_legal_actions_mask()}
         return {}
     
-    # def _get_legal_actions_mask(self):
-    #     """Return an array of legal actions for the current player."""
-    #     legal_actions = np.zeros(Action.NUM_POSSIBLE_ACTIONS, dtype=np.int8)
-
-    #     player = self.player_state[self.game_state.current_player]
-    #     num_cards = self.num_cards
-
-    #     # If all cards are flipped, we must pass
-    #     if player.is_face_up_all():
-    #         legal_actions[0] = 1
-
-    #     # Available actions after drawing from deck
-    #     for icard in range(num_cards):
-    #         if player.is_face_down(icard):
-    #             legal_actions[icard + 1] = 1
-    #             legal_actions[icard + num_cards + 1] = 1
-        
-    #     # Available actions after picking up from discard pile
-    #     idx = 2 * num_cards + 1
-    #     for n in range(1, self.max_discard() + 1):
-    #         for combo in combinations(np.arange(num_cards), n):
-    #             if all(player.is_face_down(i) for i in combo):
-    #                 legal_actions[idx] = 1
-    #             idx += 1
-
-    #     return legal_actions
-
     def is_legal_action(self, action: int):
         action_mask = compute_action_mask(self)
         return action_mask[action]
@@ -223,26 +190,35 @@ class TontoEnv(gym.Env):
         # Calculate best and worst possible outcome using available legal actions
         # best, worst = self.possible_scores_extrema()
 
-        # Apply action
-        # self.apply_action(action)
-
         reward = 0.0
+        player.previous_known_score = player.known_score
+
+        # Apply action
 
         action, val, _ = decode_action(act)
 
-        if round_state.phase == "draw":
+        if round_state.phase == Phase.DRAW:
             reward += self._handle_draw(action, val)
 
-        elif round_state.phase == "discard":
+        elif round_state.phase == Phase.DISCARD:
             reward += self._handle_discard(action, val)
 
-        elif round_state.phase == "flip":
+        elif round_state.phase == Phase.FLIP:
             reward += self._handle_flip(action, val)
 
-        if round_state.phase in ["discard", "flip"]:
-            if player.num_to_flip == 0:
-                done = True
-                assert len(player.holding_cards) == 0
+        elif round_state.phase == Phase.DECLARE_JOKER:
+            reward += self._handle_joker(action, val)
+
+        elif round_state.phase == Phase.END:
+            assert len(player.holding_cards) == 0
+            assert player.num_to_flip == 0
+            assert not np.any(player.visible_undeclared_jokers)
+            print('did we advance turn??')
+            self.advance_turn()
+            
+
+        # if round_state.phase in ["discard", "flip"]:
+        #     if player.num_to_flip == 0:
         
         # if round_state.phase == 'end_'
         # TODO: call jokers at the end
@@ -258,9 +234,8 @@ class TontoEnv(gym.Env):
         # reward = self.compute_reward(score, best, worst)
         # reward = 1.0
 
-        # Advance turn
         
-        return self._get_obs(), reward, round_state.complete, False, self._get_info()
+        return self._get_obs(), reward, self.round_state.complete, False, self._get_info()
 
     def apply_action(self, action_int: int):
         # Perform draw -> discard -> flip using core action helpers
@@ -285,36 +260,57 @@ class TontoEnv(gym.Env):
         player.action = (act, n)
         player.holding_cards = cards
         player.num_to_flip = len(cards)
-        round_state.phase = "discard"
-        return 0.0
+        round_state.phase = Phase.DISCARD
+        return self._compute_reward()
     
     def _handle_discard(self, act, idx=None):
         round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
         if act == "discard_drawn":
             round_state.discard_pile.append(player.holding_cards.pop())
-            round_state.phase = "flip"
+            round_state.phase = Phase.FLIP
         elif act == "discard_own":
             round_state.discard_pile.append(player.cards[idx])
             player.cards[idx] = player.holding_cards.pop()
             player.flip(idx)
             player.num_to_flip -= 1
-            round_state.phase = "end_turn" if player.num_to_flip == 0 else "discard"
+            if player.num_to_flip == 0:
+                if np.any(player.visible_undeclared_jokers):
+                    round_state.phase = Phase.DECLARE_JOKER
+                else:
+                    round_state.phase = Phase.END
         else:
             raise ValueError('Invalid action.')
         player.action = (act, idx)
-        return 0.0
+        return self._compute_reward()
 
     def _handle_flip(self, act, idx):
         round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
         if act == "flip":
             player.flip(idx)
-            round_state.phase = "end_turn"
+            if np.any(player.visible_undeclared_jokers):
+                round_state.phase = Phase.DECLARE_JOKER
+            else:
+                round_state.phase = Phase.END
         else:
             raise ValueError('Invalid action.')
         player.action = (act, idx)
-        return 0.0
+        return self._compute_reward()
+    
+    def _handle_joker(self, act, rank):
+        round_state = self.round_state
+        player = self.player_state[self.game_state.current_player]
+        if act == "declare_joker":
+            player.declare_joker(rank)
+            if np.any(player.visible_undeclared_jokers):
+                round_state.phase = Phase.DECLARE_JOKER
+            else:
+                round_state.phase = Phase.END
+        else:
+            raise ValueError('Invalid action.')
+        player.action = (act, rank)
+        return self._compute_reward()
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reinitialize the environment. If seed is provided, reseed RNGs."""
@@ -350,47 +346,22 @@ class TontoEnv(gym.Env):
 
     def advance_round(self):
         for player in self.player_state:
-            score = compute_player_score(player, style='flipped')
-            player.individual_scores.append(score)
-        self.game_state.round_number += 1
-        if self.game_state.round_number >= self.config.num_rounds:
+            player.individual_scores.append(player.final_flipped_score)
+        self.game_state.current_round += 1
+        self.initialize_round()
+        if self.game_state.current_round >= self.num_rounds:
             self.game_state.complete = True
     
     def advance_turn(self):
         self.game_state.current_player = (self.game_state.current_player + 1) % self.num_players
         self.round_state.complete = all(p.is_face_up_all() for p in self.player_state)
-        self.round_state.phase = 'draw'
+        self.round_state.phase = Phase.DRAW
+        
+    def _compute_reward(self):
+        player = self.player_state[self.game_state.current_player]
+        return -1*(player.known_score - player.previous_known_score)
 
     @property
     def max_draw_from_discard(self):
         player = self.player_state[self.game_state.current_player]
         return min(self.round_state.num_discard, player.num_face_down)
-
-    def possible_scores_extrema(self):
-        best = self.config.max_possible_score
-        worst = self.config.min_possible_score
-        legal_actions_mask = np.array(self._get_legal_actions_mask(), dtype=bool)
-        for action_int, legal in enumerate(legal_actions_mask):
-            env_tmp = copy.deepcopy(self)
-            if legal == 0:
-                continue
-
-            env_tmp.apply_action(action_int)
-            score = compute_player_score(env_tmp.player_state[env_tmp.game_state.current_player], style='known')
-            best = min(score, best) 
-            worst = max(score, worst)
-        return best, worst
-
-    def compute_reward(self, score, best, worst):
-        if score == best:
-            return 1.0
-        elif score == worst:
-            return 0.0
-        reward = (score - worst)/(best - worst)
-        assert 0.0 <= reward <= 1.0
-        return reward
-
-    def compute_player_scores(self, assert_flipped=False):
-        return [
-            compute_player_score(p, style='flipped', assert_flipped=assert_flipped) for p in self.player_state
-        ]

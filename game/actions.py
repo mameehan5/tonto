@@ -1,8 +1,12 @@
 from enum import IntEnum
 import numpy as np
 
+from game.phases import Phase
+
 MAX_CARDS = 20
 NUM_RANKS = 13
+
+RANK_STRS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
 
 class Action(IntEnum):
     DRAW_DECK = 0
@@ -19,7 +23,7 @@ class Action(IntEnum):
 
     DECLARE_JOKER_0 = FLIP_0 + MAX_CARDS
 
-    END_TURN = DECLARE_JOKER_0 + 1
+    END_TURN = DECLARE_JOKER_0 + MAX_CARDS
 
     NUM_POSSIBLE_ACTIONS = END_TURN + 1
 
@@ -45,7 +49,7 @@ def decode_action(action: int):
     
     elif Action.DECLARE_JOKER_0 <= action < Action.DECLARE_JOKER_0 + MAX_CARDS:
         r = action - Action.DECLARE_JOKER_0
-        return "declare_joker", r, "Declare joker as rank {r}"
+        return "declare_joker", r, f"Declare joker as rank {RANK_STRS[r]}"
 
     elif action == Action.END_TURN:
         return "end_turn", None, "Turn has ended"
@@ -59,16 +63,19 @@ def compute_action_mask(env):
     phase = env.round_state.phase
     num_cards = env.game_state.num_cards
 
-    if phase == "draw":
+    if phase == Phase.DRAW:
         mask[0] = True
         mask[Action.PICKUP_DISCARD_0 : (Action.PICKUP_DISCARD_0 + env.max_draw_from_discard)] = True
 
-    elif phase == "discard":
+    elif phase == Phase.DISCARD:
         if player.action[0] == "draw_deck":
             mask[Action.DISCARD_DRAWN] = True
         mask[Action.DISCARD_OWN_0 : Action.DISCARD_OWN_0 + num_cards] = player.face_down
 
-    elif phase == "flip":
+    elif phase == Phase.FLIP:
         mask[Action.FLIP_0 : Action.FLIP_0 + num_cards] = player.face_down
+
+    elif phase == Phase.DECLARE_JOKER:
+        mask[Action.DECLARE_JOKER_0 : Action.DECLARE_JOKER_0 + NUM_RANKS] = True
 
     return mask

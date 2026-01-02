@@ -3,6 +3,7 @@ from tqdm import tqdm
 import gymnasium as gym
 
 import numpy as np
+from scipy.signal import medfilt
 
 from core.wrappers import obs_to_key
 
@@ -10,12 +11,15 @@ from core.config import GameConfig
 from core.environment import CardGameEnv
 from training.agent import TontoAgent
 
+
+from matplotlib import pyplot as plt
+
 env_name = "TontoEnv"
 num_eval_episodes = 1
 
 # Training hyperparameters
-learning_rate = 0.01        # How fast to learn (higher = faster but less stable)
-num_episodes = 10000       # Number of hands to practice
+learning_rate = 0.02        # How fast to learn (higher = faster but less stable)
+num_episodes = 50_000      # Number of hands to practice
 start_epsilon = 1.0         # Start with 100% random actions
 final_epsilon = 0.1         # Always keep some exploration
 
@@ -29,7 +33,7 @@ agent = TontoAgent(
     env=env,
     learning_rate=learning_rate,
     initial_epsilon=start_epsilon,
-    epsilon_decay=(start_epsilon - final_epsilon) / num_episodes,
+    epsilon_decay=(start_epsilon - final_epsilon) / (num_episodes/2),
     final_epsilon=final_epsilon,
 )
 
@@ -60,9 +64,7 @@ for episode in tqdm(range(num_episodes)):
     agent.decay_epsilon()
 
 assert len(agent.total_scores) == num_episodes
-print(agent.total_scores)
-
-from matplotlib import pyplot as plt
+# print(agent.total_scores)
 
 def get_moving_avgs(arr, window, convolution_mode):
     """Compute moving average to smooth noisy data."""
@@ -74,33 +76,31 @@ def get_moving_avgs(arr, window, convolution_mode):
 
 # Smooth over a 500-episode window
 rolling_length = 100
-# fig, axs = plt.subplots(ncols=3, figsize=(12, 5))
 fig, (ax1,ax2) = plt.subplots(1, 2)
 
 # Episode performance
-ax2.set_title("Machine Performance")
 total_scores_average = get_moving_avgs(
     agent.total_scores,
-    rolling_length,
-    "same"
+    rolling_length, 
+    'valid'
 )
-ax1.plot(np.arange(num_episodes)+1, total_scores_average)
+ax1.plot(range(len(total_scores_average)), total_scores_average)
 ax1.set_xlabel("Episode")
 ax1.set_ylabel("Total Player Score")
-
+ax1.set_title("Machine Performance")
 
 # Training error (how much we're still learning)
-ax2.set_title("Training Error")
 training_error = get_moving_avgs(
     agent.training_error,
-    rolling_length,
-    "same"
+    rolling_length, 
+    'valid'
 )
 ax2.plot(range(len(training_error)), training_error)
 ax2.set_xlabel("Step")
-ax2.set_ylabel("Temporal Difference Error")
+ax2.set_ylabel("Temporal Difference")
+ax2.set_title("Training Error")
 
-plt.tight_layout()
+fig.set_size_inches(5.25,2.5,forward=True)
+plt.tight_layout(pad=1.0)
 
-fig.set_size_inches(5.25,2.0,forward=True)
-plt.savefig('training.png', dpi=300)
+plt.savefig('training.png', bbox_inches='tight', dpi=300)

@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Optional
 from game.cards import Card
+from game.phases import Phase
 
 import numpy as np
+
+from collections import Counter
 
 @dataclass
 class GameState:
@@ -38,7 +41,7 @@ class RoundState:
 
     def __post_init__(self):
         self.complete = False
-        self.phase = 'draw'
+        self.phase = Phase.DRAW
 
     @property
     def num_discard(self) -> int:
@@ -48,7 +51,6 @@ class RoundState:
 class PlayerState:
     player_number: int
     num_cards: int
-    # cards: list[Optional[Card]] = field(init=False, repr=False)
 
     def __post_init__(self):
         self.individual_scores: list[int] = []
@@ -65,20 +67,25 @@ class PlayerState:
         self.holding_cards = []
         self.num_to_flip = 0
         self.action = (None, None)
+        self.previous_known_score = self.known_score
 
     @property
-    def cards(self) -> list[Optional[Card]]:
+    def cards(self):
         return self._cards
-    
-    @property
-    def face_down(self):
-        return ~self.face_up
 
     @cards.setter
     def cards(self, cards: list[Optional[Card]]):
         if len(cards) != self.num_cards:
             raise ValueError(f"Expected {self.num_cards} cards, got {len(cards)}")
         self._cards = cards
+
+    @property
+    def card_suits(self):
+        return np.array([c.suit for c in self.cards])
+    
+    @property
+    def card_ranks(self):
+        return np.array([c.rank for c in self.cards])
 
     def is_face_up(self, idx: int) -> bool:
         return self.face_up[idx]
@@ -88,6 +95,10 @@ class PlayerState:
 
     def is_face_up_all(self) -> bool:
         return all(self.face_up)
+    
+    @property
+    def face_down(self):
+        return ~self.face_up
 
     def is_privately_seen(self, idx: int) -> bool:
         return self.private_seen[idx]
@@ -101,6 +112,77 @@ class PlayerState:
             raise ValueError(f'Card index {idx} is already flipped up')
         self.face_up[idx] = True
 
+    def declare_joker(self, rank):
+        assert np.any(self.visible_undeclared_jokers)
+        idx = np.argmax(self.visible_undeclared_jokers)
+        assert self.is_face_up(idx)
+        assert self.cards[idx].rank == -1 and self.cards[idx].suit == 4
+        self.cards[idx].rank = rank
+
     @property
-    def score(self) -> int:
+    def known_score(self) -> int:
+        cards = self.cards + self.holding_cards
+        known = self.face_up & self.private_seen
+        known = np.concatenate([known, np.ones_like(self.holding_cards, dtype=bool)])
+        card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
+        return sum(rank_score(rank, count) for rank, count in card_counts.items())
+
+    @property
+    def flipped_score(self) -> int:
+        card_counts = Counter(c.rank for c, up in zip(self.cards, self.face_up) if up)
+        return sum(rank_score(rank, count) for rank, count in card_counts.items())
+    
+    @property
+    def final_flipped_score(self) -> int:
+        assert self.is_face_up_all()
+        return self.flipped_score
+
+    @property
+    def total_score(self) -> int:
         return sum(self.individual_scores)
+    
+    @property
+    def visible_undeclared_jokers(self):
+        return self.face_up & (self.card_suits == 4) & (self.card_ranks == -1)
+
+def rank_score(rank, count):
+    assert -1 <= rank <= 12
+    assert count >= 1
+
+    # Jokers
+    if rank == -1:
+        return 0
+
+    # Kings
+    if rank == 12:
+        if count == 1 or count == 2:
+            return 0
+        if count == 3:
+            return -10
+        elif count >= 4:
+            return -5 * count
+
+    # Fives
+    if rank == 4:
+        return -5 * count
+
+    # Face value
+    if rank in [10,11]:
+        face_value = 10
+    elif rank == 0:
+        face_value = 1
+    else:
+        face_value = int(rank + 1)
+
+    # General grouping rules
+    if count == 1:
+        return face_value
+    elif count == 2:
+        return 0
+    elif count == 3:
+        return -face_value
+    elif count >= 4:
+        return -5 * count
+
+    raise ValueError(f'No score determined. Rank: {rank}. Count: {count}')
+
