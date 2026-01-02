@@ -1,6 +1,16 @@
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(ROOT))
+
 from core.environment import CardGameEnv
+from core.config import GameConfig
 from core.actions import legal_actions_draw, legal_actions_discard, legal_actions_flip
 from core.actions import view_drawn_cards
+
+
+
 
 def print_scores(env: CardGameEnv):
     print("\nScores after round", env.game_state.round_number)
@@ -111,3 +121,8 @@ def run_terminal_game(env: CardGameEnv):
     print("\n" + 80*"=")
     print("Game over! All rounds completed.")
     print(80*"=")
+
+if __name__ == '__main__':
+    config = GameConfig(num_players=2, num_decks=1, num_rounds=3, num_cards=2)
+    env = CardGameEnv(config, seed=42)
+    run_terminal_game(env)
