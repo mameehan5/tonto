@@ -5,12 +5,10 @@ import gymnasium as gym
 import numpy as np
 from scipy.signal import medfilt
 
-from core.wrappers import obs_to_key
+from training.q_agent import TontoAgent
 
-from core.config import GameConfig
-from core.environment import CardGameEnv
-from training.agent import TontoAgent
-
+from env.environment import TontoEnv
+from training.wrappers import obs_to_key
 
 from matplotlib import pyplot as plt
 
@@ -18,8 +16,8 @@ env_name = "TontoEnv"
 num_eval_episodes = 1
 
 # Training hyperparameters
-learning_rate = 0.02        # How fast to learn (higher = faster but less stable)
-num_episodes = 50_000      # Number of hands to practice
+learning_rate = 0.01        # How fast to learn (higher = faster but less stable)
+num_episodes = 100_000      # Number of hands to practice
 start_epsilon = 1.0         # Start with 100% random actions
 final_epsilon = 0.1         # Always keep some exploration
 
@@ -27,13 +25,12 @@ final_epsilon = 0.1         # Always keep some exploration
 # TODO: rename cardgame to tonto
 
 # Create environment and agent
-cfg = GameConfig(num_players=2, num_decks=1, num_rounds=1, num_cards=2)
-env = CardGameEnv(config=cfg)
+env = TontoEnv(num_players=2, num_decks=1, num_rounds=1, num_cards=2)
 agent = TontoAgent(
     env=env,
     learning_rate=learning_rate,
     initial_epsilon=start_epsilon,
-    epsilon_decay=(start_epsilon - final_epsilon) / (num_episodes/2),
+    epsilon_decay=(start_epsilon - final_epsilon) / (num_episodes/1.5),
     final_epsilon=final_epsilon,
 )
 
@@ -42,16 +39,18 @@ print(f"Starting training for {num_episodes} episodes...")
 for episode in tqdm(range(num_episodes)):
     # Start a new hand
     obs, info = env.reset()
+    mask = np.array(obs['actions_mask'], dtype=np.int8)
     obs = obs_to_key(obs, env.observation_space)
 
     # Play one complete round
     while not env.round_state.complete:
 
         # Agent chooses action (initially random, gradually more intelligent)
-        action = agent.get_action(obs, info)
+        action = agent.get_action(obs, mask)
 
         # Take action and observe result
         next_obs, reward, terminated, truncated, info = env.step(action)
+        mask = np.array(next_obs['actions_mask'], dtype=np.int8)
         next_obs = obs_to_key(next_obs, env.observation_space)
 
         # Learn from this experience
@@ -75,7 +74,7 @@ def get_moving_avgs(arr, window, convolution_mode):
     ) / window
 
 # Smooth over a 500-episode window
-rolling_length = 100
+rolling_length = 500
 fig, (ax1,ax2) = plt.subplots(1, 2)
 
 # Episode performance

@@ -42,7 +42,7 @@ class TontoAgent:
         self.training_error = []
         self.total_scores = []
 
-    def get_action(self, obs, info) -> int:
+    def get_action(self, obs, mask) -> int:
         """Choose an action using epsilon-greedy strategy.
 
         Returns:
@@ -50,7 +50,6 @@ class TontoAgent:
         """
         # With probability epsilon: explore (random action)
         # print('obs', type(obs), obs)
-        mask = info['legal_actions_mask']
         if np.random.random() < self.epsilon:
             return self.env.action_space.sample(mask=mask)
 
@@ -92,7 +91,7 @@ class TontoAgent:
         self.training_error.append(temporal_difference)
         if self.env.round_state.complete:
             self.total_scores.append(sum(
-                self.env.compute_player_scores(assert_flipped=True)
+                p.final_flipped_score for p in self.env.player_state
             ))
 
     def decay_epsilon(self):
