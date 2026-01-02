@@ -83,6 +83,9 @@ class TontoEnv(gym.Env):
             #     )
             # ),
 
+            "phase": spaces.Discrete(
+                5
+            ),
 
             # "current_player": spaces.Discrete(
             #     self.num_players
@@ -99,13 +102,13 @@ class TontoEnv(gym.Env):
             #     "joker_declared": spaces.MultiBinary(MAX_CARDS),
             #     "phase": spaces.Discrete(len(PHASES)),
             # })
+            
 
-            "actions_mask": spaces.MultiBinary(
-                (
-                    int(Action.NUM_POSSIBLE_ACTIONS),
-                )
-            ),
-            # Need to add top of card pile filtered on legal actions
+            # "actions_mask": spaces.MultiBinary(
+            #     (
+            #         int(Action.NUM_POSSIBLE_ACTIONS),
+            #     )
+            # ),
         })
         self.action_space = spaces.Discrete(int(Action.NUM_POSSIBLE_ACTIONS))
 
@@ -168,7 +171,8 @@ class TontoEnv(gym.Env):
             "seen": seen, 
             "discarded_cards": discarded_cards, 
             "known_score": np.array([player.known_score], np.int32), 
-            "actions_mask": compute_action_mask(self)
+            # "actions_mask": compute_action_mask(self)
+            "phase": int(self.round_state.phase), 
 
             # "player_card_ranks": player_card_ranks,
             # "player_known_scores": player_known_scores, 
@@ -182,6 +186,9 @@ class TontoEnv(gym.Env):
     def _get_info(self):
         # return {"legal_actions_mask": self._get_legal_actions_mask()}
         return {}
+    
+    def action_masks(self):
+        return compute_action_mask(self).astype(bool)
     
     def is_legal_action(self, action: int):
         action_mask = compute_action_mask(self)
@@ -205,6 +212,9 @@ class TontoEnv(gym.Env):
 
         # Apply action
         action, val, _ = decode_action(act)
+
+        # print('player', self.game_state.current_player, 'phase', round_state.phase)
+        # print('action', action, 'val', val)
 
         if round_state.phase == Phase.DRAW:
             reward += self._handle_draw(action, val)
