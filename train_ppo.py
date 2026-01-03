@@ -103,7 +103,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_players", type=int, default=2,
+    parser.add_argument("--num_players", type=int, default=1,
                         help="Number of players in the game")
     parser.add_argument("--num_cards", type=int, default=4,
                         help="Cards per player (must be even)")
@@ -111,17 +111,17 @@ if __name__ == "__main__":
                         help="Number of card decks")
     parser.add_argument("--num_rounds", type=int, default=1,
                         help="Rounds per episode")
-    parser.add_argument("--num_envs", type=int, default=8,
+    parser.add_argument("--num_envs", type=int, default=2,
                         help="Number of parallel environments for training")
-    parser.add_argument("--total_timesteps", type=int, default=1000000,
+    parser.add_argument("--total_timesteps", type=int, default=5000000,
                         help="Total timesteps for training")
-    parser.add_argument("--n_steps", type=int, default=2048,
+    parser.add_argument("--n_steps", type=int, default=4096,
                         help="Rollout steps per update (PPO hyperparameter)")
     parser.add_argument("--batch_size", type=int, default=64,
                         help="Minibatch size (PPO hyperparameter)")
-    parser.add_argument("--learning_rate", type=float, default=1e-3,
+    parser.add_argument("--learning_rate", type=float, default=3e-4,
                         help="Learning rate for Adam optimizer")
-    parser.add_argument("--eval_freq", type=int, default=100000,
+    parser.add_argument("--eval_freq", type=int, default=20000,
                         help="Evaluate every X timesteps (0 to disable)")
     parser.add_argument("--save_path", type=str, default="models/",
                         help="Directory to save models and logs")

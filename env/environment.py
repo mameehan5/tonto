@@ -74,6 +74,12 @@ class TontoEnv(gym.Env):
                 shape=(self.game_state.max_num_cards,), 
                 dtype=np.int32
             ), 
+            "draw_card": spaces.Box(
+                low=-1, 
+                high=12, 
+                shape=(1,), 
+                dtype=np.int32
+            ), 
             
             # NEED TO ADD BELOW
             # "discarded_cards": spaces.MultiBinary(
@@ -82,33 +88,17 @@ class TontoEnv(gym.Env):
             #         num_ranks + 1 # +1 for empty slots
             #     )
             # ),
-
             "phase": spaces.Discrete(
                 5
+            ), 
+            "current_player": spaces.Discrete(
+                self.num_players
             ),
-
-            # "current_player": spaces.Discrete(
-            #     self.num_players
-            # ),
-            # "num_cards_per_player_half": spaces.Discrete(
-            #     self.config.max_num_cards // 2
-            # ),
-
-
-            # self.observation_space = spaces.Dict({
-            #     ,
-                
-            #     "is_joker": spaces.MultiBinary(MAX_CARDS),
-            #     "joker_declared": spaces.MultiBinary(MAX_CARDS),
-            #     "phase": spaces.Discrete(len(PHASES)),
-            # })
-            
-
-            # "actions_mask": spaces.MultiBinary(
-            #     (
-            #         int(Action.NUM_POSSIBLE_ACTIONS),
-            #     )
-            # ),
+            "actions_mask": spaces.MultiBinary(
+                (
+                    int(Action.NUM_POSSIBLE_ACTIONS),
+                )
+            ),
         })
         self.action_space = spaces.Discrete(int(Action.NUM_POSSIBLE_ACTIONS))
 
@@ -121,15 +111,6 @@ class TontoEnv(gym.Env):
 
         player = self.player_state[self.game_state.current_player]
 
-        # Player card ranks
-        # player_card_ranks = np.zeros((num_players, num_cards, num_ranks + 1), dtype=np.int8)
-        # for ip, player in enumerate(self.player_state):
-        #     for ic, (c,up) in enumerate(zip(player.cards, player.face_up)):
-        #         if up is True:
-        #             player_card_ranks[ip, ic, c.rank] = 1
-        #         else:
-        #             player_card_ranks[ip, ic, num_ranks] = 1  # face-down indicator
-
         # Hand ranks
         hand_ranks = np.zeros((self.game_state.max_num_cards), dtype=np.int32)
         face_up = np.zeros((self.game_state.max_num_cards), dtype=np.int8)
@@ -140,24 +121,6 @@ class TontoEnv(gym.Env):
             hand_ranks[ic] = c.rank
             face_up[ic] = up
             seen[ic] = se
-        
-        # Known score
-        # known_score = 
-
-
-
-        # Player known score
-        # player_known_scores = np.empty((self.num_players), dtype=np.int32)
-        # for ip, player in enumerate(self.player_state):
-        #     if ip == self.game_state.current_player:
-        #         player_known_scores[ip] = compute_player_score(player, style='known')
-        #     else:
-        #         player_known_scores[ip] = compute_player_score(player, style='flipped')
-            
-        # Calculate unknown card size
-        # num_unflipped_cards = len(self.round_state.draw_deck)
-        # for player in self.player_state:
-        #     num_unflipped_cards += player.num_face_down
 
         # Set discarded cards
         discarded_cards = -np.ones((self.game_state.max_num_cards), dtype=np.int32)
@@ -165,22 +128,19 @@ class TontoEnv(gym.Env):
         for ic, c in enumerate(reversed(self.round_state.discard_pile[-num_cards:])):
             discarded_cards[mx-ic-1] = c.rank
 
+        draw_card = np.zeros((1), dtype=np.int32)
+        draw_card[0] = self.round_state.draw_deck[-1].rank
+
         return {
             "hand_ranks": hand_ranks, 
             "face_up": face_up, 
             "seen": seen, 
             "discarded_cards": discarded_cards, 
             "known_score": np.array([player.known_score], np.int32), 
-            # "actions_mask": compute_action_mask(self)
+            "actions_mask": compute_action_mask(self), 
             "phase": int(self.round_state.phase), 
-
-            # "player_card_ranks": player_card_ranks,
-            # "player_known_scores": player_known_scores, 
-            # # "num_unflipped_cards": np.array([num_unflipped_cards], dtype=np.int32), 
-            # "discarded_cards": discarded_cards, 
-            # "current_player": self.game_state.current_player,
-            # "num_cards_per_player_half": self.num_players // 2,
-            # "legal_actions_mask": self._get_legal_actions_mask()
+            "draw_card": draw_card, 
+            "current_player": int(self.game_state.current_player), 
         }
     
     def _get_info(self):
@@ -233,6 +193,8 @@ class TontoEnv(gym.Env):
             assert player.num_to_flip == 0
             assert not np.any(player.visible_undeclared_jokers)
             self.advance_turn()
+            if self.round_state.complete:
+                reward += -np.sum(self.compute_player_scores())/10
                     
         return self._get_obs(), reward, self.round_state.complete, False, self._get_info()
 
@@ -357,7 +319,14 @@ class TontoEnv(gym.Env):
         
     def _compute_reward(self):
         player = self.player_state[self.game_state.current_player]
-        return -1*(player.known_score - player.previous_known_score)
+        if player.known_score < player.previous_known_score:
+            return 0.1
+        else:
+            return -0.1
+        # return -1*(player.known_score - player.previous_known_score)
+
+    def compute_player_scores(self):
+        return np.array([p.final_flipped_score for p in self.player_state])
 
     @property
     def max_draw_from_discard(self):
