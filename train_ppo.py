@@ -6,8 +6,14 @@ from sb3_contrib.ppo_mask import MaskablePPO
 # Maskable callback and evaluation
 from sb3_contrib.common.maskable.callbacks import MaskableEvalCallback
 from sb3_contrib.common.maskable.evaluation import evaluate_policy
+from sb3_contrib.common.maskable.utils import get_action_masks
 
 from sb3_contrib.common.wrappers import ActionMasker
+from stable_baselines3.common.vec_env import SubprocVecEnv
+
+from stable_baselines3.common.callbacks import CheckpointCallback
+
+
 
 # Import the Tonto environment and config
 from env.environment import TontoEnv
@@ -27,17 +33,6 @@ def make_env_fn(num_players, num_cards, num_decks, num_rounds, seed=None):
 
 def main(args):
     # Create a vectorized environment (parallel instances for faster data collection)
-    # We use MaskablePPO, which supports vectorized envs with built-in masks.
-    # vec_env = make_vec_env(
-    #     env_id=lambda: TontoEnv(
-    #         num_players=args.num_players, 
-    #         num_decks=args.num_decks, 
-    #         num_rounds=args.num_rounds, 
-    #         num_cards=args.num_cards, 
-    #         seed=args.seed
-    #     ), 
-    #     n_envs=args.num_envs
-    # )
     env_fn = make_env_fn(
         num_players=args.num_players,
         num_cards=args.num_cards,
@@ -47,24 +42,44 @@ def main(args):
     )
     vec_env = make_vec_env(
         env_id=env_fn,
-        n_envs=args.num_envs
+        n_envs=args.num_envs, 
+        # vec_env_cls=SubprocVecEnv # parallelize over envs
     )
 
-    from sb3_contrib.common.maskable.utils import get_action_masks
     masks = get_action_masks(vec_env)
     assert masks is not None
 
+    # checkpoint_callback = CheckpointCallback(
+    #     save_freq=50_000,
+    #     save_path=args.save_path,
+    #     name_prefix="ppo_tonto_checkpoint"
+    # )
+
     # Configure PPO with MlpPolicy and optional GPU usage
-    model = MaskablePPO(
-        "MultiInputPolicy", 
-        # "MlpPolicy", 
-        vec_env,
-        verbose=1,
-        n_steps=args.n_steps,
-        batch_size=args.batch_size,
-        learning_rate=args.learning_rate,
-        device="auto",  # use GPU if available
-    )
+    if args.load_file is None:
+        model = MaskablePPO(
+            "MultiInputPolicy", 
+            vec_env,
+            verbose=1,
+            # tensorboard_log=args.log_path, 
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate, 
+            gamma=0.995, # 0.99, higher for longer episodes
+            gae_lambda=0.97, # increased from default since sparse rewards
+            ent_coef=0.03, # increased from 0.01 to promote variability, less deterministic
+            vf_coef=0.5, # default
+            clip_range=0.1, # 0.2 default, lower to slow policy update 
+            n_epochs=10, # 5-10, num epochs over rollout data update
+            max_grad_norm=0.5, # default
+            device="auto",  # use GPU if available
+        )
+    else:
+        model = MaskablePPO.load(
+            args.load_file,
+            env=vec_env,
+            device="auto"
+        )
 
     # Optional: evaluation setup using a separate env
     if args.eval_freq > 0:
@@ -76,7 +91,7 @@ def main(args):
         )
         # Wrap eval_env for masking if needed (similar to training env)
         eval_callback = MaskableEvalCallback(
-            eval_env, 
+            eval_env,
             best_model_save_path=args.save_path,
             log_path=args.log_path,
             eval_freq=args.eval_freq,
@@ -113,18 +128,20 @@ if __name__ == "__main__":
                         help="Rounds per episode")
     parser.add_argument("--num_envs", type=int, default=2,
                         help="Number of parallel environments for training")
-    parser.add_argument("--total_timesteps", type=int, default=10000,
+    parser.add_argument("--total_timesteps", type=int, default=100000,
                         help="Total timesteps for training")
-    parser.add_argument("--n_steps", type=int, default=4096,
+    parser.add_argument("--n_steps", type=int, default=8192,
                         help="Rollout steps per update (PPO hyperparameter)")
-    parser.add_argument("--batch_size", type=int, default=64,
+    parser.add_argument("--batch_size", type=int, default=128,
                         help="Minibatch size (PPO hyperparameter)")
-    parser.add_argument("--learning_rate", type=float, default=3e-4,
+    parser.add_argument("--learning_rate", type=float, default=1e-4,
                         help="Learning rate for Adam optimizer")
     parser.add_argument("--eval_freq", type=int, default=20000,
                         help="Evaluate every X timesteps (0 to disable)")
     parser.add_argument("--save_path", type=str, default="models/",
                         help="Directory to save models and logs")
+    parser.add_argument("--load_file", type=str, default=None,
+                        help="File to load model from checkpoint")
     parser.add_argument("--log_path", type=str, default="logs/",
                         help="Directory for evaluation logs")
     parser.add_argument("--seed", type=int, default=None,

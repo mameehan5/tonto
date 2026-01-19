@@ -20,7 +20,7 @@ class Card:
 
     @property
     def rank_str(self):
-        if self.rank == -1:
+        if self.rank == 13:
             return '?'
         return RANK_STRS[self.rank]
     
@@ -46,12 +46,6 @@ class Card:
             return int(self.rank + 1)
         assert self.suit == 4 and self.face_up is False
         return None
-
-    # def __post_init__(self):
-    #     object.__setattr__(self, 'rank_str', RANK_STRS[self.rank])
-    #     object.__setattr__(self, 'suit_str', SUIT_STRS[self.suit])
-    #     object.__setattr__(self, 'card_str', f"{RANK_STRS[self.rank]}{SUIT_STRS[self.suit]}")
-    #     object.__setattr__(self, 'card_value', card_value(self))
 
 def create_standard_deck(num_decks: int = 1) -> List[Card]:
     deck: List[Card] = []

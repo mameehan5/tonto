@@ -197,7 +197,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_cards", type=int, default=4)
     parser.add_argument("--num_decks", type=int, default=1)
     parser.add_argument("--num_rounds", type=int, default=2)
-    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=None)
 
     parser.add_argument(
         "--human_players",
