@@ -10,7 +10,9 @@ from sb3_contrib.common.maskable.utils import get_action_masks
 
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.monitor import Monitor
 
+from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
 
 
@@ -28,7 +30,9 @@ def make_env_fn(num_players, num_cards, num_decks, num_rounds, seed=None):
             num_cards=num_cards, 
             seed=seed
         )
-        return ActionMasker(env, lambda e: e.action_masks())
+        env = ActionMasker(env, lambda e: e.action_masks())
+        env = Monitor(env, filename=os.path.join(args.log_path, "monitor.csv"))
+        return env
     return _init
 
 def main(args):
@@ -61,7 +65,6 @@ def main(args):
             "MultiInputPolicy", 
             vec_env,
             verbose=1,
-            # tensorboard_log=args.log_path, 
             n_steps=args.n_steps,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate, 
@@ -100,6 +103,9 @@ def main(args):
         )
     else:
         eval_callback = None
+    
+    # Logging
+    model.set_logger(configure(args.log_path, ["stdout","csv"]))
 
     # Train the agent
     model.learn(total_timesteps=args.total_timesteps, callback=eval_callback)
@@ -111,7 +117,7 @@ def main(args):
     mean_reward, std_reward = evaluate_policy(
         model, 
         vec_env, 
-        n_eval_episodes=100, 
+        n_eval_episodes=50, 
         deterministic=True
     )
     print(f"Evaluation: mean_reward={mean_reward:.2f} +/- {std_reward:.2f}")
