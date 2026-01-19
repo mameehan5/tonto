@@ -6,33 +6,37 @@ from game.actions import decode_action
 
 # Create our training environment
 register(id="TontoTestEnv", entry_point="env.environment:TontoEnv")
-env = gym.make("TontoTestEnv", num_players=4, num_decks=3, num_rounds=1, num_cards=8)
+env = gym.make("TontoTestEnv", num_players=4, num_decks=4, num_rounds=1, num_cards=12)
 
-# Reset environment to start a new episode
-observation, info = env.reset()
+# Play over several games for testing
+for i in range(100):
+    print(f'Game {i+1}')
 
-# Iterate until round is over
-episode_over = False
-total_reward = 0
-idx = 1
-while not episode_over:
-    print(f"Play {idx}")
+    # Reset environment to start a new episode
+    observation, info = env.reset()
 
-    # Identify legal action
-    mask = np.array(observation['actions_mask'], dtype=np.int8)
-    action = env.action_space.sample(mask=mask)
+    # Iterate until round is over
+    episode_over = False
+    total_reward = 0
+    idx = 1
+    while not episode_over:
+        # print(f"Play {idx}")
 
-    # Take the action
-    observation, reward, terminated, truncated, info = env.step(action)
+        # Identify legal action
+        mask = np.array(observation['actions_mask'], dtype=np.int8)
+        action = env.action_space.sample(mask=mask)
 
-    # Collect information
-    total_reward += reward
-    episode_over = terminated
+        # Take the action
+        observation, reward, terminated, truncated, info = env.step(action)
 
-    if truncated:
-        raise RuntimeError('Game terminated early')
+        # Collect information
+        total_reward += reward
+        episode_over = terminated
 
-    idx += 1
+        if truncated:
+            raise RuntimeError('Game terminated early')
 
-print(f"Round finished!")
+        idx += 1
+
+print(f"Finished all games!")
 env.close()

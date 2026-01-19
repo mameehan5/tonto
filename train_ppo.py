@@ -113,7 +113,7 @@ if __name__ == "__main__":
                         help="Rounds per episode")
     parser.add_argument("--num_envs", type=int, default=2,
                         help="Number of parallel environments for training")
-    parser.add_argument("--total_timesteps", type=int, default=5000000,
+    parser.add_argument("--total_timesteps", type=int, default=10000,
                         help="Total timesteps for training")
     parser.add_argument("--n_steps", type=int, default=4096,
                         help="Rollout steps per update (PPO hyperparameter)")

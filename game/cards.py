@@ -62,6 +62,6 @@ def create_standard_deck(num_decks: int = 1) -> List[Card]:
                 deck.append(Card(id=id, rank=r, suit=s))
                 id += 1
         for _ in range(2):
-            deck.append(Card(id=id, rank=-1, suit=4))
+            deck.append(Card(id=id, rank=13, suit=4))
             id += 1
     return deck

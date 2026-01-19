@@ -5,19 +5,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
 from sb3_contrib.common.wrappers import ActionMasker
+from sb3_contrib.common.maskable.utils import get_action_masks
 
 import numpy as np
 import time
 
 import argparse
 
-from training.wrappers import obs_to_key
 from env.environment import TontoEnv
 
 from game.actions import compute_action_mask, decode_action
 
 from sb3_contrib.ppo_mask import MaskablePPO
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 def print_scores(env: TontoEnv):
     print("\nScores after round", env.game_state.current_round)
@@ -132,8 +131,6 @@ def load_ppo_agent(model_path, env):
     return model
 
 def ppo_choose_action(model, env, obs):
-    from sb3_contrib.common.maskable.utils import get_action_masks
-
     masks = get_action_masks(env)
     assert masks is not None, "Masking NOT active in terminal env"
     action, _ = model.predict(obs, action_masks=masks, deterministic=True)
@@ -207,6 +204,7 @@ if __name__ == '__main__':
         type=int,
         nargs="*",
         default=[0],
+        required=True,
         help="Indices of human players (e.g. 0 1)"
     )
 
@@ -214,6 +212,7 @@ if __name__ == '__main__':
         "--ppo_model",
         type=str,
         default=None,
+        required=True,
         help="Path to PPO model (.zip)"
     )
 

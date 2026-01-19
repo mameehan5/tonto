@@ -3,7 +3,7 @@ import numpy as np
 
 from game.phases import Phase
 
-MAX_CARDS = 20
+MAX_CARDS = 12
 NUM_RANKS = 13
 
 RANK_STRS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
@@ -22,7 +22,7 @@ class Action(IntEnum):
 
     DECLARE_JOKER_0 = FLIP_0 + MAX_CARDS
 
-    END_TURN = DECLARE_JOKER_0 + MAX_CARDS
+    END_TURN = DECLARE_JOKER_0 + NUM_RANKS
 
     NUM_POSSIBLE_ACTIONS = END_TURN + 1
 
@@ -46,7 +46,7 @@ def decode_action(action: int):
         c = action - Action.FLIP_0
         return "flip", c, f"Flip card index {c}"
     
-    elif Action.DECLARE_JOKER_0 <= action < Action.DECLARE_JOKER_0 + MAX_CARDS:
+    elif Action.DECLARE_JOKER_0 <= action < Action.DECLARE_JOKER_0 + NUM_RANKS:
         r = action - Action.DECLARE_JOKER_0
         return "declare_joker", r, f"Declare joker as rank {RANK_STRS[r]}"
 

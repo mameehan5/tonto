@@ -22,6 +22,10 @@ class TontoEnv(gym.Env):
         self.num_decks = num_decks
         self.num_rounds = num_rounds
         self.num_cards = num_cards
+
+        self.max_num_players = 4
+        self.max_num_cards = 12
+        self.num_ranks = 13
         self.reset(seed=seed)
 
         # Check if encode/decode are consistent inverses
@@ -30,12 +34,16 @@ class TontoEnv(gym.Env):
         #     reencoded = self.encode_actions(actions)
         #     assert action_int == reencoded, f"Action encoding/decoding mismatch: {action_int} -> {actions} -> {reencoded}"
 
-        num_ranks = 13
+        # num_ranks = 13
         self.observation_space = spaces.Dict({
-            "hand_ranks": spaces.Box(
-                low=-1, 
-                high=12, 
-                shape=(self.game_state.max_num_cards,), 
+            # # "hand_ranks": spaces.Box(
+            # #     low=-1, 
+            # #     high=12, 
+            # #     shape=(self.max_num_cards,), 
+            # #     dtype=np.int32
+            # # ),
+            "hand_ranks": spaces.MultiDiscrete(
+                nvec=[14] * self.max_num_cards, 
                 dtype=np.int32
             ), 
             # "player_card_ranks": spaces.MultiBinary(
@@ -59,27 +67,35 @@ class TontoEnv(gym.Env):
             #     dtype=np.int32, 
             # ),
 
-            "face_up": spaces.MultiBinary((self.game_state.max_num_cards,)),
-            "seen": spaces.MultiBinary((self.game_state.max_num_cards,)),
+            "face_up": spaces.MultiBinary((self.max_num_cards,)),
+            "seen": spaces.MultiBinary((self.max_num_cards,)),
             "known_score": spaces.Box(
-                low=(-5*self.game_state.max_num_cards), 
-                high=(10*self.game_state.max_num_cards), 
+                low=(-5*self.max_num_cards), 
+                high=(10*self.max_num_cards), 
                 shape=(1,), 
                 dtype=np.int32
             ), 
 
-            "discarded_cards": spaces.Box(
-                low=-1, 
-                high=12, 
-                shape=(self.game_state.max_num_cards,), 
-                dtype=np.int32
-            ), 
-            "draw_card": spaces.Box(
-                low=-1, 
-                high=12, 
-                shape=(1,), 
-                dtype=np.int32
-            ), 
+            # "discarded_cards": spaces.Box(
+            #     low=-1, 
+            #     high=12, 
+            #     shape=(self.max_num_cards,), 
+            #     dtype=np.int32
+            # ), 
+
+
+            # "discarded_cards": spaces.MultiDiscrete(
+            #     nvec=[14] * self.max_num_cards, 
+            #     dtype=np.int32
+            # ), 
+
+
+            # "draw_card": spaces.Box(
+            #     low=-1, 
+            #     high=12, 
+            #     shape=(1,), 
+            #     dtype=np.int32
+            # ), 
             
             # NEED TO ADD BELOW
             # "discarded_cards": spaces.MultiBinary(
@@ -91,9 +107,9 @@ class TontoEnv(gym.Env):
             "phase": spaces.Discrete(
                 5
             ), 
-            "current_player": spaces.Discrete(
-                self.num_players
-            ),
+            # "current_player": spaces.Discrete(
+            #     self.num_players
+            # ),
             "actions_mask": spaces.MultiBinary(
                 (
                     int(Action.NUM_POSSIBLE_ACTIONS),
@@ -112,21 +128,21 @@ class TontoEnv(gym.Env):
         player = self.player_state[self.game_state.current_player]
 
         # Hand ranks
-        hand_ranks = np.zeros((self.game_state.max_num_cards), dtype=np.int32)
-        face_up = np.zeros((self.game_state.max_num_cards), dtype=np.int8)
-        seen = np.zeros((self.game_state.max_num_cards), dtype=np.int8)
+        hand_ranks = np.full((self.max_num_cards), self.num_ranks, dtype=np.int32)
+        face_up = np.zeros((self.max_num_cards), dtype=np.int8)
+        seen = np.zeros((self.max_num_cards), dtype=np.int8)
         for ic, (c,up,se) in enumerate(zip(
             player.cards, player.face_up, player.private_seen
         )):
-            hand_ranks[ic] = c.rank
+            if up: 
+                hand_ranks[ic] = c.rank
             face_up[ic] = up
             seen[ic] = se
 
         # Set discarded cards
-        discarded_cards = -np.ones((self.game_state.max_num_cards), dtype=np.int32)
-        mx = self.game_state.max_num_cards
+        discarded_cards = np.full((self.max_num_cards), self.num_ranks, dtype=np.int32)
         for ic, c in enumerate(reversed(self.round_state.discard_pile[-num_cards:])):
-            discarded_cards[mx-ic-1] = c.rank
+            discarded_cards[self.max_num_cards-ic-1] = c.rank
 
         draw_card = np.zeros((1), dtype=np.int32)
         draw_card[0] = self.round_state.draw_deck[-1].rank
@@ -135,12 +151,12 @@ class TontoEnv(gym.Env):
             "hand_ranks": hand_ranks, 
             "face_up": face_up, 
             "seen": seen, 
-            "discarded_cards": discarded_cards, 
+            # "discarded_cards": discarded_cards, 
             "known_score": np.array([player.known_score], np.int32), 
             "actions_mask": compute_action_mask(self), 
             "phase": int(self.round_state.phase), 
-            "draw_card": draw_card, 
-            "current_player": int(self.game_state.current_player), 
+            # "draw_card": draw_card, 
+            # "current_player": int(self.game_state.current_player), 
         }
     
     def _get_info(self):

@@ -27,8 +27,6 @@ class GameState:
         self.current_round = 0
         self.complete = False
 
-        self.max_num_cards = 20
-
         self.num_total_cards = self.num_decks * 54
         self.num_ranks = 13
 
@@ -127,7 +125,7 @@ class PlayerState:
         known = np.concatenate([known, np.ones_like(self.holding_cards, dtype=bool)])
         if any(c.rank == -1 for c in cards if c is not None):
             # Identify jokers
-            jokers = np.zeros((13), dtype=bool)
+            jokers = np.zeros((len(cards)), dtype=bool)
             for i,card in enumerate(cards):
                 jokers[i] = True
 
@@ -168,11 +166,11 @@ class PlayerState:
         return self.face_up & (self.card_suits == 4) & (self.card_ranks == -1)
 
 def rank_score(rank, count):
-    assert -1 <= rank <= 12
+    assert 0 <= rank <= 13
     assert count >= 1
 
     # Jokers
-    if rank == -1:
+    if rank == 13:
         return 0
 
     # Kings

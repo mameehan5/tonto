@@ -6,6 +6,7 @@ This repository contains a Python-based implementation of a custom multiplayer c
 
 ## Table of Contents
 
+0. [Installation](#installation)
 1. [Game Setup](#game-setup)  
 2. [Deck and Cards](#deck-and-cards)  
 3. [Gameplay Flow](#gameplay-flow)  
@@ -19,6 +20,12 @@ This repository contains a Python-based implementation of a custom multiplayer c
 11. [Terminal UI Notes](#terminal-ui-notes)
 
 ---
+
+## Installation
+
+After installing conda, please install the following packages
+conda install --yes numpy matplotlib gymnasium
+conda install --yes -c conda-forge sb3-contrib
 
 ## Game Setup
 
