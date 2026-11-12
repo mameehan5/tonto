@@ -81,7 +81,7 @@ class PlayerState:
         self.holding_cards = []
         self.num_to_flip = 0
         self.action = (None, None)
-        self.previous_known_score = self.known_score
+        self.previous_known_score = self.known_score if cards is not None else 0
 
     @property
     def cards(self):
@@ -136,7 +136,7 @@ class PlayerState:
     @property
     def known_score(self) -> int:
         cards = copy.deepcopy(self.cards + self.holding_cards)
-        known = self.face_up & self.private_seen
+        known = self.face_up | self.private_seen
         known = np.concatenate([known, np.ones_like(self.holding_cards, dtype=bool)])
         # Assign each known, undeclared joker its best possible rank
         for card, k in zip(cards, known):

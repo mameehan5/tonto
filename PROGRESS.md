@@ -36,3 +36,16 @@
 3. Training: fix obs/reward, self-play wrapper (learner vs frozen/heuristic opponents), start 2p/4 cards, scale up.
 4. Server: FastAPI + WebSockets, rooms by code, server-authoritative hidden info, bots fill seats.
 5. Client: web/PWA first (works on iPhone), native SwiftUI later.
+
+## 2026-11-12 — Step 1: engine refactor + GUI (branch `engine-refactor-gui`)
+
+**Done**
+- `game/engine.py` `TontoGame`: rules engine with legal actions, `step`, per-player `view` (hides others' face-down cards), JSON `to_dict`/`from_dict`, move log.
+- Gym env is now a thin wrapper. Same seeds → identical games as before (rule harness counts match exactly).
+- `game/bots.py`: `RandomBot`, `GreedyBot` (one-step greedy on estimated hand score). Greedy beats random ~96% (2p, 4 or 8 cards).
+- Web GUI (`python gui/server.py`): reveal all hands, auto/step bots, undo, click cards to act, log, scores.
+- `tests/simulate_rules.py` (rule harness, now also checks serialization + view privacy), `scripts/eval_bots.py`.
+
+**Bug fixed:** `known_score` used `face_up & private_seen` (should be `|`), so peeked cards never counted as known. This feeds PPO reward shaping.
+
+**Next:** Step 2/3 — training fixes (obs, competitive reward, self-play vs greedy), eval by win rate vs greedy.

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tonto</title>
+<style>
+  :root {
+    --felt: #1f5c45; --felt-dark: #174634; --ink: #f3efe4; --muted: #b9c9bf;
+    --card: #fffdf7; --red: #c0392b; --black: #1d1d1d; --gold: #e8b64c; --back: #2b4a8b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: var(--felt-dark); color: var(--ink); }
+  header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px;
+           background: #10311f; border-bottom: 1px solid #0b2416; }
+  header h1 { font-size: 18px; margin: 0 12px 0 0; letter-spacing: .5px; }
+  header label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  input[type=number] { width: 52px; }
+  input, select, button { font: inherit; border-radius: 6px; border: 1px solid #3c6b55;
+                          background: #163d2b; color: var(--ink); padding: 4px 8px; }
+  button { cursor: pointer; background: #2a7556; border-color: #3a8c69; }
+  button:hover { background: #33896a; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--gold); color: #2a1f05; border-color: #c99a35; font-weight: 600; }
+  .sep { width: 1px; height: 24px; background: #2c5a44; }
+  main { display: grid; grid-template-columns: 1fr 320px; gap: 14px; padding: 14px 16px; }
+  .table { background: var(--felt); border-radius: 14px; padding: 14px; box-shadow: inset 0 0 40px #0006; }
+  .center { display: flex; gap: 24px; align-items: flex-start; padding: 8px 4px 16px;
+            border-bottom: 1px dashed #ffffff22; margin-bottom: 12px; flex-wrap: wrap; }
+  .pile h3, .player h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-end; }
+  .players { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .player { border-radius: 10px; padding: 10px; background: #ffffff0d; border: 2px solid transparent; }
+  .player.current { border-color: var(--gold); background: #ffffff18; }
+  .player.inactive { opacity: .45; }
+  .player h3 { display: flex; justify-content: space-between; color: var(--ink); }
+  .player .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: #0003; color: var(--muted); margin-left: 6px; }
+  .card { width: 46px; height: 64px; border-radius: 6px; background: var(--card); color: var(--black);
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          font-weight: 700; font-size: 17px; position: relative; box-shadow: 0 1px 3px #0007; user-select: none; }
+  .card .suit { font-size: 18px; line-height: 1; }
+  .card.red { color: var(--red); }
+  .card.joker { color: #7d3c98; }
+  .card.hidden { background: repeating-linear-gradient(135deg, #e9e4d8, #e9e4d8 5px, #ddd6c6 5px, #ddd6c6 10px);
+                 opacity: .85; outline: 2px dashed #8a8270; outline-offset: -4px; }
+  .card.back { background: repeating-linear-gradient(45deg, var(--back), var(--back) 4px, #345aa3 4px, #345aa3 8px);
+               border: 3px solid #fff; }
+  .card.small { width: 36px; height: 50px; font-size: 14px; }
+  .card.clickable { cursor: pointer; box-shadow: 0 0 0 3px var(--gold); }
+  .card.clickable:hover { transform: translateY(-3px); }
+  .card .eye { position: absolute; top: 1px; right: 3px; font-size: 10px; }
+  .slot { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: var(--muted); }
+  .holding { margin-top: 8px; display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--gold); }
+  aside { display: flex; flex-direction: column; gap: 12px; }
+  .panel { background: #10311f; border-radius: 10px; padding: 10px 12px; }
+  .panel h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .actions { display: flex; flex-direction: column; gap: 6px; }
+  .actions button { text-align: left; }
+  #log { max-height: 46vh; overflow-y: auto; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
+  #log div { padding: 2px 0; border-bottom: 1px solid #ffffff0a; }
+  #log .sys { color: var(--gold); }
+  #log .detail { color: #8fd3b5; }
+  .banner { background: var(--gold); color: #2a1f05; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+  .warn { background: #7a4d12; color: #ffe2b0; padding: 6px 12px; font-size: 12px; }
+  .err { background: #7a1c12; color: #ffd4cc; padding: 6px 12px; font-size: 12px; }
+  .legend { font-size: 11px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .legend .card { width: 16px; height: 22px; font-size: 0; box-shadow: none; }
+  table.scores { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.scores td, table.scores th { padding: 2px 4px; text-align: right; }
+  table.scores th:first-child, table.scores td:first-child { text-align: left; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🂡 Tonto</h1>
+  <label>Players <input id="players" type="number" min="2" max="12" value="4"></label>
+  <label>Cards <input id="cards" type="number" min="2" max="20" step="2" value="6"></label>
+  <label>Decks <input id="decks" type="number" min="1" max="4" value="1"></label>
+  <label>Rounds <input id="rounds" type="number" min="1" max="10" value="2"></label>
+  <label>Seed <input id="seed" type="number" placeholder="random" style="width:80px"></label>
+  <span id="seatSelects" style="display:flex; gap:4px; flex-wrap:wrap"></span>
+  <button class="primary" onclick="newGame()">New game</button>
+  <span class="sep"></span>
+  <label><input id="reveal" type="checkbox" checked onchange="refresh()"> Reveal all hands</label>
+  <label><input id="auto" type="checkbox" checked onchange="tick()"> Auto-play bots</label>
+  <label>Speed <select id="speed"><option value="900">Slow</option><option value="400" selected>Normal</option>
+    <option value="100">Fast</option><option value="0">Instant</option></select></label>
+  <button id="botBtn" onclick="botStep()">Bot move ▶</button>
+  <button id="undoBtn" onclick="undo()">Undo ↶</button>
+</header>
+<div id="msg"></div>
+<main>
+  <section class="table">
+    <div id="banner"></div>
+    <div class="center">
+      <div class="pile"><h3 id="roundName"></h3><div id="phaseInfo" style="font-size:13px"></div></div>
+      <div class="pile"><h3>Deck</h3><div class="row"><div class="card back"></div><span id="deckCount"></span></div></div>
+      <div class="pile"><h3>Discard pile <span id="discardCount" class="tag"></span></h3><div class="row" id="discard"></div></div>
+    </div>
+    <div class="players" id="players-area"></div>
+    <div class="legend">
+      <span><span class="card"></span> face-up</span>
+      <span><span class="card hidden"></span> face-down (revealed for evaluation)</span>
+      <span>👁 peeked by owner</span>
+      <span><span class="card back"></span> unknown to viewer</span>
+    </div>
+  </section>
+  <aside>
+    <div class="panel"><h2>Actions</h2><div class="actions" id="actions"></div></div>
+    <div class="panel"><h2>Scores</h2><div id="scores"></div></div>
+    <div class="panel"><h2>Log</h2><div id="log"></div></div>
+  </aside>
+</main>
+<script>
+let S = null, timer = null;
+const RED = new Set([1, 2]);
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                          body: JSON.stringify({...body, reveal: $('reveal').checked})};
+  const r = await fetch(path, opts);
+  const d = await r.json();
+  $('msg').innerHTML = d.error ? `<div class="err">${d.error}</div>` : (d.warning ? `<div class="warn">⚠ ${d.warning}</div>` : '');
+  if (!d.error) { S = d; render(); }
+  return d;
+}
+const $ = id => document.getElementById(id);
+const refresh = () => api('/api/state?reveal=' + ($('reveal').checked ? 1 : 0));
+const act = a => { stopAuto(); return api('/api/act', {action: a}).then(tick); };
+const botStep = () => api('/api/bot', {}).then(tick);
+const undo = () => { $('auto').checked = false; api('/api/undo', {}); };
+const nextRound = () => api('/api/next_round', {}).then(tick);
+function stopAuto() { clearTimeout(timer); timer = null; }
+
+function seatSelects() {
+  const n = +$('players').value, old = [...document.querySelectorAll('.seat')].map(s => s.value);
+  $('seatSelects').innerHTML = Array.from({length: n}, (_, i) =>
+    `<select class="seat" title="Player ${i}">${['human', 'greedy', 'random'].map(t =>
+      `<option ${(old[i] || (i ? 'greedy' : 'human')) === t ? 'selected' : ''}>${t}</option>`).join('')}</select>`).join('');
+}
+$('players').onchange = seatSelects;
+
+function newGame() {
+  stopAuto();
+  api('/api/new', {players: $('players').value, cards: $('cards').value, decks: $('decks').value,
+    rounds: $('rounds').value, seed: $('seed').value,
+    seats: [...document.querySelectorAll('.seat')].map(s => s.value)}).then(tick);
+}
+
+function cardHTML(c, opts = {}) {
+  const cls = ['card', opts.small ? 'small' : ''];
+  const click = opts.click !== undefined ? `onclick="act(${opts.click})"` : '';
+  if (opts.click !== undefined) cls.push('clickable');
+  if (!c) return `<div class="${cls.join(' ')} back" ${click}></div>`;
+  let rank = c.str.slice(0, -1), suit = c.str.slice(-1);
+  if (c.joker) { cls.push('joker'); suit = '🃏'; rank = c.rank === 13 ? '' : rank; }
+  else if (RED.has(c.suit)) cls.push('red');
+  if (opts.hidden) cls.push('hidden');
+  return `<div class="${cls.join(' ')}" ${click}>${opts.eye ? '<span class="eye">👁</span>' : ''}<span>${rank}</span><span class="suit">${suit}</span></div>`;
+}
+
+function render() {
+  const v = S.view, seats = S.seats;
+  const curSeat = seats[v.current_player];
+  $('roundName').textContent = v.round_name.startsWith('Round') ? `${v.round_name} of ${v.num_rounds}` : v.round_name;
+  $('phaseInfo').innerHTML = v.game_complete ? '' :
+    `Player ${v.current_player} <span class="tag">${curSeat}</span><br>Phase: <b>${v.phase}</b>`;
+  $('deckCount').textContent = v.deck_count;
+  $('discardCount').textContent = v.discard_count + ' cards';
+  $('discard').innerHTML = v.discard_top.map((c, i) => cardHTML(c, {small: i < v.discard_top.length - 1})).join('')
+    + (v.discard_top.length ? '<span style="font-size:11px;color:var(--muted)">← top</span>' : '');
+
+  // Card clicks map to legal replace/flip actions
+  const slotAction = {};
+  for (const a of v.legal_actions) {
+    const m = a.label.match(/^(Replace|Flip) slot (\d+)/);
+    if (m) slotAction[m[2]] = a.action;
+  }
+
+  $('players-area').innerHTML = v.players.map(p => {
+    const cur = p.id === v.current_player && !v.game_complete;
+    const cards = p.cards.map((s, i) => {
+      const hidden = s.card && !s.face_up;
+      const click = cur && !v.round_complete && slotAction[i] !== undefined ? slotAction[i] : undefined;
+      return `<div class="slot">${cardHTML(s.card, {hidden, eye: s.seen && !s.face_up, click})}<span>${i}</span></div>`;
+    }).join('');
+    const hold = p.holding.length ? `<div class="holding">Holding: ${p.holding.map(c => cardHTML(c, {small: true})).join('')}</div>` : '';
+    const known = p.known_score !== null ? ` · knows ${p.known_score}` : '';
+    return `<div class="player ${cur ? 'current' : ''} ${p.active ? '' : 'inactive'}">
+      <h3><span>Player ${p.id}<span class="tag">${seats[p.id]}</span>${p.id === v.winner ? ' 🏆' : ''}</span>
+          <span>face-up ${p.flipped_score}${known}</span></h3>
+      <div class="row">${cards}</div>${hold}
+      <div class="meta">Total ${p.total}${p.scores.length ? ' · rounds [' + p.scores.join(', ') + ']' : ''}${p.tiebreak_scores.length ? ' · tiebreak [' + p.tiebreak_scores.join(', ') + ']' : ''}</div>
+    </div>`;
+  }).join('');
+
+  // Banner for round/game end
+  let banner = '';
+  if (v.game_complete) banner = `<div class="banner">Game over — Player ${v.winner} wins 🏆</div>`;
+  else if (v.round_complete) banner = `<div class="banner">Round complete: ${v.players.filter(p => p.active)
+      .map(p => `P${p.id} ${p.flipped_score}`).join(' · ')} <button onclick="nextRound()">Next round ▶</button></div>`;
+  $('banner').innerHTML = banner;
+
+  // Actions
+  const isBot = curSeat !== 'human';
+  $('actions').innerHTML = v.round_complete || v.game_complete ? '<i style="color:var(--muted)">—</i>' :
+    (isBot ? '<div style="font-size:12px;color:var(--muted)">Bot to move (you can still pick for it):</div>' : '') +
+    v.legal_actions.map(a => `<button onclick="act(${a.action})">${a.label}</button>`).join('');
+  $('botBtn').disabled = !isBot || v.round_complete || v.game_complete;
+  $('undoBtn').disabled = !S.can_undo;
+
+  // Scores table
+  const nr = Math.max(...v.players.map(p => p.scores.length));
+  $('scores').innerHTML = `<table class="scores"><tr><th>Player</th>${Array.from({length: nr}, (_, i) => `<th>R${i + 1}</th>`).join('')}<th>Total</th></tr>`
+    + v.players.map(p => `<tr><td>P${p.id} ${seats[p.id]}</td>${Array.from({length: nr}, (_, i) => `<td>${p.scores[i] ?? ''}</td>`).join('')}<td><b>${p.total}</b></td></tr>`).join('')
+    + '</table>';
+
+  // Log (newest at bottom)
+  const log = $('log');
+  log.innerHTML = v.log.map(e => e.player === null ? `<div class="sys">${e.text}</div>`
+    : `<div>P${e.player} ${e.text}${e.detail ? ` <span class="detail">(${e.detail})</span>` : ''}</div>`).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+// Auto-play: step bots on a timer while it's a bot's turn
+function tick() {
+  stopAuto();
+  if (!S || !$('auto').checked) return;
+  const v = S.view;
+  if (v.game_complete || v.round_complete || S.seats[v.current_player] === 'human') return;
+  timer = setTimeout(() => botStep(), +$('speed').value);
+}
+
+seatSelects();
+refresh().then(tick);
+</script>
+</body>
+</html>

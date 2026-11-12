@@ -27,6 +27,23 @@ After installing conda, please install the following packages
 conda install --yes numpy matplotlib gymnasium
 conda install --yes -c conda-forge sb3-contrib
 
+## Quick Start
+
+```bash
+python gui/server.py                                # web GUI at http://localhost:8000
+python scripts/eval_bots.py greedy random --games 500   # bot win rates
+python tests/simulate_rules.py                      # random-play rule checks
+```
+
+The GUI lets you play against bots, step through bot moves, undo, and toggle **Reveal all hands** to see every player's face-down cards (dashed = face-down, 👁 = peeked by owner) for evaluating bot play.
+
+## Code Layout
+
+- `game/engine.py` — `TontoGame`: the rules engine (legal actions, `step`, per-player `view`, `to_dict`/`from_dict`). Everything else wraps this.
+- `game/bots.py` — `RandomBot`, `GreedyBot` (decide from their own view only).
+- `env/environment.py` — Gymnasium wrapper for RL training.
+- `gui/` — local web GUI. `ui/terminal.py` — terminal UI.
+
 ## Game Setup
 
 - **Players:** 2–12  
