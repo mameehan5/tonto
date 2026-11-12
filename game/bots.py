@@ -6,7 +6,7 @@ import numpy as np
 from game.actions import Action
 from game.state import rank_score
 
-UNKNOWN_VALUE = 4.5  # rough expected value of an unseen card
+UNKNOWN_VALUE = 2.5  # value assumed for an unseen card (tuned; below its true mean ~4.5, which favors keeping unknowns)
 JOKER = 13
 
 
@@ -14,13 +14,13 @@ def card_value(rank):
     return rank_score(rank, 1) if rank != JOKER else -5
 
 
-def estimate(ranks, n_unknown):
+def estimate(ranks, n_unknown, unknown_value=UNKNOWN_VALUE):
     """Estimated hand score: known ranks grouped by the scoring rules, unknowns at their expected value.
     Jokers are assigned whichever rank gives the lowest score."""
     fixed = [r for r in ranks if r != JOKER]
     for _ in range(len(ranks) - len(fixed)):
         fixed.append(min(range(13), key=lambda r: _score(fixed + [r])))
-    return _score(fixed) + UNKNOWN_VALUE * n_unknown
+    return _score(fixed) + unknown_value * n_unknown
 
 
 def _score(ranks):
@@ -38,8 +38,9 @@ class RandomBot:
 class GreedyBot:
     """One-step greedy on the estimated hand score."""
 
-    def __init__(self, pickup_threshold=2.5):
+    def __init__(self, pickup_threshold=5.0, unknown_value=UNKNOWN_VALUE):
         self.pickup_threshold = pickup_threshold
+        self.unknown_value = unknown_value
 
     def act(self, game, pid):
         view = game.view(pid)
@@ -53,7 +54,7 @@ class GreedyBot:
             s = list(slots)
             for i, r in replacements.items():
                 s[i] = r
-            return estimate([r for r in s if r is not None], s.count(None))
+            return estimate([r for r in s if r is not None], s.count(None), self.unknown_value)
 
         def best_slot(rank, used=()):
             options = [i for i in face_down if i not in used]
@@ -95,4 +96,16 @@ class GreedyBot:
         return Action.END_TURN
 
 
-BOTS = {"greedy": GreedyBot, "random": RandomBot}
+BOTS = {
+    "greedy": GreedyBot,
+    "greedy_v0": lambda: GreedyBot(pickup_threshold=2.5, unknown_value=4.5),  # untuned original
+    "random": RandomBot,
+}
+
+
+def make_bot(spec, seed=None):
+    """'greedy', 'random', or 'ppo:<path to model.zip>'."""
+    if spec.startswith("ppo:"):
+        from training.policy_bot import PolicyBot  # needs torch/sb3; import only when used
+        return PolicyBot(spec[4:])
+    return RandomBot(seed) if spec == "random" else BOTS[spec]()

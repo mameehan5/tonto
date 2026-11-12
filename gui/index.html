@@ -118,6 +118,7 @@
 <script>
 let S = null, timer = null;
 const RED = new Set([1, 2]);
+const short = s => s.startsWith('ppo:') ? 'ppo:' + s.split('/').pop().replace('.zip', '') : s;
 
 async function api(path, body) {
   const opts = body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -138,9 +139,10 @@ function stopAuto() { clearTimeout(timer); timer = null; }
 
 function seatSelects() {
   const n = +$('players').value, old = [...document.querySelectorAll('.seat')].map(s => s.value);
+  const opts = S ? S.seat_options : ['human', 'greedy', 'random'];
   $('seatSelects').innerHTML = Array.from({length: n}, (_, i) =>
-    `<select class="seat" title="Player ${i}">${['human', 'greedy', 'random'].map(t =>
-      `<option ${(old[i] || (i ? 'greedy' : 'human')) === t ? 'selected' : ''}>${t}</option>`).join('')}</select>`).join('');
+    `<select class="seat" title="Player ${i}">${opts.map(t =>
+      `<option value="${t}" ${(old[i] || (i ? 'greedy' : 'human')) === t ? 'selected' : ''}>${short(t)}</option>`).join('')}</select>`).join('');
 }
 $('players').onchange = seatSelects;
 
@@ -167,8 +169,8 @@ function render() {
   const v = S.view, seats = S.seats;
   const curSeat = seats[v.current_player];
   $('roundName').textContent = v.round_name.startsWith('Round') ? `${v.round_name} of ${v.num_rounds}` : v.round_name;
-  $('phaseInfo').innerHTML = v.game_complete ? '' :
-    `Player ${v.current_player} <span class="tag">${curSeat}</span><br>Phase: <b>${v.phase}</b>`;
+  $('phaseInfo').innerHTML = v.game_complete || v.round_complete ? '' :
+    `Player ${v.current_player} <span class="tag">${short(curSeat)}</span><br>Phase: <b>${v.phase}</b>`;
   $('deckCount').textContent = v.deck_count;
   $('discardCount').textContent = v.discard_count + ' cards';
   $('discard').innerHTML = v.discard_top.map((c, i) => cardHTML(c, {small: i < v.discard_top.length - 1})).join('')
@@ -191,7 +193,7 @@ function render() {
     const hold = p.holding.length ? `<div class="holding">Holding: ${p.holding.map(c => cardHTML(c, {small: true})).join('')}</div>` : '';
     const known = p.known_score !== null ? ` · knows ${p.known_score}` : '';
     return `<div class="player ${cur ? 'current' : ''} ${p.active ? '' : 'inactive'}">
-      <h3><span>Player ${p.id}<span class="tag">${seats[p.id]}</span>${p.id === v.winner ? ' 🏆' : ''}</span>
+      <h3><span>Player ${p.id}<span class="tag">${short(seats[p.id])}</span>${p.id === v.winner ? ' 🏆' : ''}</span>
           <span>face-up ${p.flipped_score}${known}</span></h3>
       <div class="row">${cards}</div>${hold}
       <div class="meta">Total ${p.total}${p.scores.length ? ' · rounds [' + p.scores.join(', ') + ']' : ''}${p.tiebreak_scores.length ? ' · tiebreak [' + p.tiebreak_scores.join(', ') + ']' : ''}</div>
@@ -216,7 +218,7 @@ function render() {
   // Scores table
   const nr = Math.max(...v.players.map(p => p.scores.length));
   $('scores').innerHTML = `<table class="scores"><tr><th>Player</th>${Array.from({length: nr}, (_, i) => `<th>R${i + 1}</th>`).join('')}<th>Total</th></tr>`
-    + v.players.map(p => `<tr><td>P${p.id} ${seats[p.id]}</td>${Array.from({length: nr}, (_, i) => `<td>${p.scores[i] ?? ''}</td>`).join('')}<td><b>${p.total}</b></td></tr>`).join('')
+    + v.players.map(p => `<tr><td>P${p.id} ${short(seats[p.id])}</td>${Array.from({length: nr}, (_, i) => `<td>${p.scores[i] ?? ''}</td>`).join('')}<td><b>${p.total}</b></td></tr>`).join('')
     + '</table>';
 
   // Log (newest at bottom)
@@ -235,8 +237,7 @@ function tick() {
   timer = setTimeout(() => botStep(), +$('speed').value);
 }
 
-seatSelects();
-refresh().then(tick);
+refresh().then(() => { seatSelects(); tick(); });
 </script>
 </body>
 </html>

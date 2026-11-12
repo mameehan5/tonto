@@ -49,3 +49,23 @@
 **Bug fixed:** `known_score` used `face_up & private_seen` (should be `|`), so peeked cards never counted as known. This feeds PPO reward shaping.
 
 **Next:** Step 2/3 — training fixes (obs, competitive reward, self-play vs greedy), eval by win rate vs greedy.
+
+## 2026-11-12 — Step 2: baselines + evaluation (branch `baselines-eval`)
+
+**Done**
+- `scripts/eval_bots.py`: any mix of bots, seats shuffled each game (rotation caused a turn-order bias), win rate ± 95% CI.
+- `make_bot(spec)`: `greedy`, `greedy_v0`, `random`, `ppo:<path>`. `PolicyBot` runs trained models; GUI lists `models/*.zip` as seats.
+- `make_obs(game)` builds the PPO observation from any game state (env uses it too).
+- Tuned `GreedyBot` (sweep over pickup threshold × unknown-card value): now threshold 5, unknown 2.5. Old settings kept as `greedy_v0`.
+- Old models in `models/` fail to load (obs/action spaces changed) — retrain in step 3.
+
+**Baselines** (1 round, 1 deck, 1000 games)
+| Matchup | Cards | Win rate |
+|---|---|---|
+| greedy vs random | 4 | 95.4% |
+| greedy vs random | 8 | 98.4% |
+| greedy vs greedy_v0 | 4 | 52.9% |
+| greedy vs greedy_v0 | 8 | 67.1% |
+| greedy vs 3× greedy_v0 | 6 | 36.0% (even = 25%) |
+
+**Target for step 3:** PPO beats `greedy` > 50% head-to-head (2p, 4 cards), then larger configs.

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from game.engine import TontoGame
-from game.bots import BOTS
+from game.bots import BOTS, make_bot
 
 
 class Session:
@@ -27,7 +27,7 @@ class Session:
             self.game = TontoGame(players, decks, rounds, cards, seed=seed)
         self.warning = str(w[0].message) if w else None
         self.seats = (list(seats) + ["greedy"] * players)[:players]
-        self.bots = {i: BOTS[s]() for i, s in enumerate(self.seats) if s != "human"}
+        self.bots = {i: make_bot(s) for i, s in enumerate(self.seats) if s != "human"}
         self.history = []
 
     def _save(self):
@@ -53,7 +53,9 @@ class Session:
     def state(self, reveal):
         humans = [i for i, s in enumerate(self.seats) if s == "human"]
         viewer = None if reveal or not humans else humans[0]
+        models = [f"ppo:{p.relative_to(ROOT)}" for p in sorted(ROOT.glob("models/**/*.zip"))]
         return {"view": self.game.view(viewer), "seats": self.seats, "can_undo": bool(self.history),
+                "seat_options": ["human"] + [b for b in BOTS if b != "greedy_v0"] + ["greedy_v0"] + models,
                 "warning": self.warning, "config": self.game.to_dict()["config"]}
 
 
@@ -91,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
             elif cmd == "undo":
                 session.undo()
             self._send(200, session.state(body.get("reveal", True)))
-        except (AssertionError, ValueError, KeyError) as e:
+        except Exception as e:  # surface config/model errors in the GUI
             self._send(400, {"error": str(e) or type(e).__name__})
 
     def log_message(self, *args):

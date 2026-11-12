@@ -1,12 +1,16 @@
-"""Pit bots against each other. Usage: python scripts/eval_bots.py greedy random --games 500 --cards 4"""
+"""Pit bots against each other; seats are shuffled every game.
+
+Usage: python scripts/eval_bots.py greedy random --games 500 --cards 4
+       python scripts/eval_bots.py ppo:models/best_model.zip greedy greedy greedy
+"""
 import sys, argparse
 from pathlib import Path
-from collections import Counter
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import warnings; warnings.simplefilter("ignore")
 import numpy as np
 from game.engine import TontoGame
-from game.bots import BOTS
+from game.bots import make_bot
+
 
 def play(bots, decks, rounds, cards, seed):
     g = TontoGame(len(bots), decks, rounds, cards, seed=seed)
@@ -17,6 +21,22 @@ def play(bots, decks, rounds, cards, seed):
         g.next_round()
     return g
 
+
+def evaluate(specs, games=500, decks=1, rounds=1, cards=4, seed0=0):
+    """Returns per-spec-index win counts and score lists."""
+    P = len(specs)
+    bots = [make_bot(s, seed=seed0 + k) for k, s in enumerate(specs)]
+    wins, scores = np.zeros(P), [[] for _ in range(P)]
+    rng = np.random.default_rng(seed0)
+    for s in range(games):
+        order = rng.permutation(P)  # seat -> spec index; shuffling avoids turn-order adjacency bias
+        g = play([bots[k] for k in order], decks, rounds, cards, seed0 + s)
+        wins[order[g.winner]] += 1
+        for seat, k in enumerate(order):
+            scores[k].append(g.player_state[seat].total_score)
+    return wins, scores
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("bots", nargs="+")
@@ -25,14 +45,10 @@ if __name__ == "__main__":
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--cards", type=int, default=4)
     a = ap.parse_args()
-    wins, totals = Counter(), {i: [] for i in range(len(a.bots))}
-    for s in range(a.games):
-        # rotate seats so no bot always goes first
-        order = [(s + i) % len(a.bots) for i in range(len(a.bots))]
-        g = play([BOTS[a.bots[k]](**({"seed": s} if a.bots[k] == "random" else {})) for k in order],
-                 a.decks, a.rounds, a.cards, s)
-        wins[order[g.winner]] += 1
-        for seat, k in enumerate(order):
-            totals[k].append(g.player_state[seat].total_score)
+    wins, scores = evaluate(a.bots, a.games, a.decks, a.rounds, a.cards)
+    print(f"{len(a.bots)} players, {a.cards} cards, {a.decks} deck(s), {a.rounds} round(s), {a.games} games "
+          f"(even skill = {1 / len(a.bots):.0%} each)")
     for k, name in enumerate(a.bots):
-        print(f"seat {k} {name:7s} win rate {wins[k]/a.games:6.1%}  mean score {np.mean(totals[k]):6.2f}")
+        p = wins[k] / a.games
+        ci = 1.96 * np.sqrt(p * (1 - p) / a.games)
+        print(f"  {k}: {name:28s} win {p:6.1%} ± {ci:4.1%}   mean score {np.mean(scores[k]):6.2f}")

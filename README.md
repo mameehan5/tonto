@@ -31,7 +31,8 @@ conda install --yes -c conda-forge sb3-contrib
 
 ```bash
 python gui/server.py                                # web GUI at http://localhost:8000
-python scripts/eval_bots.py greedy random --games 500   # bot win rates
+python scripts/eval_bots.py greedy random --games 500   # bot win rates (seats shuffled, 95% CI)
+python scripts/eval_bots.py ppo:models/best_model.zip greedy greedy   # trained model vs baselines
 python tests/simulate_rules.py                      # random-play rule checks
 ```
 
@@ -40,7 +41,8 @@ The GUI lets you play against bots, step through bot moves, undo, and toggle **R
 ## Code Layout
 
 - `game/engine.py` — `TontoGame`: the rules engine (legal actions, `step`, per-player `view`, `to_dict`/`from_dict`). Everything else wraps this.
-- `game/bots.py` — `RandomBot`, `GreedyBot` (decide from their own view only).
+- `game/bots.py` — `RandomBot`, `GreedyBot` (decide from their own view only); `make_bot("greedy" | "random" | "ppo:<path>")`.
+- `training/policy_bot.py` — wraps a trained MaskablePPO model as a bot. Models in `models/` appear as GUI seat options.
 - `env/environment.py` — Gymnasium wrapper for RL training.
 - `gui/` — local web GUI. `ui/terminal.py` — terminal UI.
 

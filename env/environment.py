@@ -69,44 +69,8 @@ class TontoEnv(gym.Env):
         self.action_space = spaces.Discrete(int(Action.NUM_POSSIBLE_ACTIONS))
 
     def _get_obs(self):
-        """Return a gym-compatible observation that matches self.observation_space."""
+        return make_obs(self.game)
 
-        player = self.player_state[self.game_state.current_player]
-
-        # Hand ranks
-        hand_ranks = np.full((self.max_num_cards), self.num_ranks, dtype=np.int32)
-        face_up = np.zeros((self.max_num_cards), dtype=np.int8)
-        seen = np.zeros((self.max_num_cards), dtype=np.int8)
-        for ic, (c,up,se) in enumerate(zip(
-            player.cards, player.face_up, player.private_seen
-        )):
-            if up: 
-                hand_ranks[ic] = c.rank
-            face_up[ic] = up
-            seen[ic] = se
-
-        # Set discarded cards
-        discarded_cards = np.full((self.max_num_cards), self.num_ranks, dtype=np.int32)
-        for ic, c in enumerate(reversed(self.round_state.discard_pile[-self.num_cards:])):
-            discarded_cards[self.max_num_cards-ic-1] = c.rank
-
-        # Set drawn cards
-        drawn_cards = np.full((self.max_num_cards), self.num_ranks, dtype=np.int32)
-        for ic, c in enumerate(player.holding_cards):
-            drawn_cards[ic] = c.rank
-
-        return {
-            "hand_ranks": hand_ranks, 
-            "face_up": face_up, 
-            "seen": seen, 
-            "discarded_cards": discarded_cards, 
-            "known_score": np.array([player.known_score], np.int32), 
-            "actions_mask": compute_action_mask(self), 
-            "phase": int(self.round_state.phase), 
-            "drawn_cards": drawn_cards, 
-            "current_player": int(self.game_state.current_player), 
-        }
-    
     def _get_info(self):
         # return {"legal_actions_mask": self._get_legal_actions_mask()}
         return {}
@@ -152,3 +116,38 @@ class TontoEnv(gym.Env):
 
     def compute_player_scores(self):
         return np.array([self.player_state[i].final_flipped_score for i in self.active_players])
+
+
+def make_obs(game):
+    """Observation for the current player of a TontoGame (matches TontoEnv.observation_space)."""
+    n, R = MAX_CARDS, 13
+    player = game.current
+
+    hand_ranks = np.full(n, R, dtype=np.int32)
+    face_up = np.zeros(n, dtype=np.int8)
+    seen = np.zeros(n, dtype=np.int8)
+    for ic, (c, up, se) in enumerate(zip(player.cards, player.face_up, player.private_seen)):
+        if up:
+            hand_ranks[ic] = c.rank
+        face_up[ic] = up
+        seen[ic] = se
+
+    discarded_cards = np.full(n, R, dtype=np.int32)
+    for ic, c in enumerate(reversed(game.round_state.discard_pile[-game.num_cards:])):
+        discarded_cards[n - ic - 1] = c.rank
+
+    drawn_cards = np.full(n, R, dtype=np.int32)
+    for ic, c in enumerate(player.holding_cards):
+        drawn_cards[ic] = c.rank
+
+    return {
+        "hand_ranks": hand_ranks,
+        "face_up": face_up,
+        "seen": seen,
+        "discarded_cards": discarded_cards,
+        "known_score": np.array([player.known_score], np.int32),
+        "actions_mask": game.legal_mask(),
+        "phase": int(game.phase),
+        "drawn_cards": drawn_cards,
+        "current_player": int(game.game_state.current_player),
+    }
