@@ -5,7 +5,7 @@ from typing import Tuple, List, Dict, Any, Optional
 
 from game.cards import create_standard_deck
 from game.state import GameState, RoundState, PlayerState
-from game.actions import Action, compute_action_mask, decode_action
+from game.actions import Action, compute_action_mask, decode_action, MAX_CARDS, MAX_PLAYERS
 from game.phases import Phase
 
 
@@ -23,8 +23,8 @@ class TontoEnv(gym.Env):
         self.num_rounds = num_rounds
         self.num_cards = num_cards
 
-        self.max_num_players = 4
-        self.max_num_cards = 12
+        self.max_num_players = MAX_PLAYERS
+        self.max_num_cards = MAX_CARDS
         self.num_ranks = 13
         self.reset(seed=seed)
 
@@ -167,6 +167,8 @@ class TontoEnv(gym.Env):
         round_state = self.round_state
         player = self.player_state[self.game_state.current_player]
         if act == "draw_deck":
+            if len(round_state.draw_deck) == 0:
+                self.reshuffle()
             cards = [round_state.draw_deck.pop()]
         elif act == "pickup_discard":
             assert n is not None
@@ -239,6 +241,13 @@ class TontoEnv(gym.Env):
         self.initialize_round()
         return (self._get_obs(), self._get_info())
 
+    def reshuffle(self):
+        """Shuffle the discard pile (except the top card) into a new draw deck."""
+        rs = self.round_state
+        rs.draw_deck = rs.discard_pile[:-1]
+        rs.discard_pile = rs.discard_pile[-1:]
+        self.np_random.shuffle(rs.draw_deck)
+
     def initialize_game(self):
         self.game_state = GameState(
             num_players = self.num_players, 
@@ -255,25 +264,43 @@ class TontoEnv(gym.Env):
             draw_deck=deck,
             discard_pile=[deck.pop()]
         )
-        for player in self.player_state:
-            player.reset([self.round_state.draw_deck.pop() for _ in range(self.num_cards)])
+        for i in self.active_players:
+            self.player_state[i].reset([self.round_state.draw_deck.pop() for _ in range(self.num_cards)])
+        if self.game_state.current_player not in self.active_players:
+            self.advance_player()
     
     def initialize_players(self):
         self.player_state = [
             PlayerState(i, self.num_cards) for i in range(self.num_players)
         ]
+        self.active_players = list(range(self.num_players))
 
     def advance_round(self):
-        for player in self.player_state:
-            player.individual_scores.append(player.final_flipped_score)
+        tiebreak = self.game_state.current_round >= self.num_rounds
+        for i in self.active_players:
+            p = self.player_state[i]
+            (p.tiebreak_scores if tiebreak else p.individual_scores).append(p.final_flipped_score)
         self.game_state.current_round += 1
-        self.initialize_round()
         if self.game_state.current_round >= self.num_rounds:
-            self.game_state.complete = True
+            # Players tied for the lowest score play another round until the tie is broken
+            score = lambda i: self.player_state[i].tiebreak_scores[-1] if tiebreak else self.player_state[i].total_score
+            low = min(score(i) for i in self.active_players)
+            self.active_players = [i for i in self.active_players if score(i) == low]
+            if len(self.active_players) == 1:
+                self.game_state.complete = True
+                self.winner = self.active_players[0]
+                return
+        self.initialize_round()
+
+    def advance_player(self):
+        gs = self.game_state
+        gs.current_player = (gs.current_player + 1) % self.num_players
+        while gs.current_player not in self.active_players:
+            gs.current_player = (gs.current_player + 1) % self.num_players
     
     def advance_turn(self):
-        self.game_state.current_player = (self.game_state.current_player + 1) % self.num_players
-        self.round_state.complete = all(p.is_face_up_all() for p in self.player_state)
+        self.advance_player()
+        self.round_state.complete = all(self.player_state[i].is_face_up_all() for i in self.active_players)
         player = self.player_state[self.game_state.current_player]
         if player.is_face_up_all():
             self.round_state.phase = Phase.END
@@ -290,7 +317,7 @@ class TontoEnv(gym.Env):
         # return -1*(player.known_score - player.previous_known_score)
 
     def compute_player_scores(self):
-        return np.array([p.final_flipped_score for p in self.player_state])
+        return np.array([self.player_state[i].final_flipped_score for i in self.active_players])
 
     @property
     def max_draw_from_discard(self):

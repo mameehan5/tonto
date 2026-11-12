@@ -31,7 +31,9 @@ conda install --yes -c conda-forge sb3-contrib
 
 - **Players:** 2–12  
 - **Decks:** 1–4 standard decks (52 cards + 2 jokers each)  
-- **Cards per player:** 2–20 (same for all players per round)  
+- **Cards per player:** 2–20, even (same for all players per round)  
+- Players × cards must leave at least 2 cards undealt. If players × cards is more than about half the total cards, a warning is shown that the draw deck may run out and reshuffling may be required.  
+- At the start of each round, each player privately sees **half of their own hand** (the first half). The other half stays unseen until flipped.  
 - **Rounds per game:** 1–10  
 - Lead player proposes the game configuration (number of decks, cards, and rounds), and all other players agree.
 
@@ -68,7 +70,7 @@ Players continue until **all cards in all hands are face-up**.
 | Jack, Queen         | 10                          |
 | King                | 0                           |
 | Two of same card    | 0 (except two 5s = -10)     |
-| Three of same card  | -face value (3 Jacks = -10) |
+| Three of same card  | -face value (3 Jacks = -10, 3 Kings = -10, 3 fives = -15) |
 | Four of a kind      | -20                         |
 | Five or more same   | -5 × number of identical    |
 | Jokers              | Wildcard (must be called)   |
@@ -79,7 +81,7 @@ Players continue until **all cards in all hands are face-up**.
 
 - **From deck:**
   - Draw **1 card**.  
-  - May flip the drawn card or **one own unflipped card**.  
+  - Either keep the drawn card (it replaces a discarded unflipped card and **must be flipped face-up**), or discard it and flip **one own unflipped card**.  
 
 - **From discard pile:**
   - Can draw **1 or more consecutive cards**.  
@@ -119,7 +121,7 @@ Players continue until **all cards in all hands are face-up**.
 
 - At round end, sum card values for each player.  
 - Player with **lowest total score wins the round**.  
-- Ties are resolved **by the number of rounds played**.
+- Scores accumulate across rounds (see below).
 
 ---
 
@@ -127,7 +129,8 @@ Players continue until **all cards in all hands are face-up**.
 
 - Number of rounds = 1–10 (set at game start).  
 - Scores accumulate across rounds.  
-- Player with **lowest cumulative score** at game end wins.
+- Player with **lowest cumulative score** at game end wins.  
+- **Ties:** if two or more players tie for the lowest score, only those players play another round. This repeats until the tie is broken.
 
 ---
 
