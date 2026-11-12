@@ -20,3 +20,19 @@
 - Trained models in `models/` incompatible (action/obs spaces grew) — retrain.
 - Tiebreak rounds: only tied players act; check effect on training rewards.
 - `game/rules.py` is dead code (imports nonexistent `GamePhase`).
+
+## 2026-11-12 — Assessment: ML player + multiplayer app
+
+**Training gaps found**
+- Obs hides the agent's own peeked cards (`hand_ranks` only shows face-up).
+- Obs lacks opponents' face-up cards, deck size, discard depth.
+- Round-end reward = −sum of *all* players' scores → cooperative, not competitive. Rewards from different seats mix in one PPO trajectory.
+- `train_ppo.py` defaults to 1 player (solitaire).
+- Eval reward noisy over 880k steps (−10.6 → −7.6); no baseline to compare against.
+
+**Plan**
+1. Refactor: pure `TontoGame` engine (state, legal actions, apply, per-player view, serialize). Gym env and server both wrap it.
+2. Baselines: random + greedy heuristic bot; eval = win rate.
+3. Training: fix obs/reward, self-play wrapper (learner vs frozen/heuristic opponents), start 2p/4 cards, scale up.
+4. Server: FastAPI + WebSockets, rooms by code, server-authoritative hidden info, bots fill seats.
+5. Client: web/PWA first (works on iPhone), native SwiftUI later.
