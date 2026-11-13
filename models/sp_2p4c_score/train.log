@@ -1,0 +1,8 @@
+Training 2p/4 cards for 1,500,000 steps -> models/sp_2p4c_score
+[  0.0 min]         2 steps | win vs greedy 6.5% (score 17.53) | vs random 52.3% | best 6.5%
+[  2.1 min]   100,000 steps | win vs greedy 40.0% (score 3.41) | vs random 92.2% | best 40.0%
+[  4.3 min]   200,000 steps | win vs greedy 43.0% (score 2.85) | vs random 92.7% | best 43.0%
+[  7.1 min]   300,000 steps | win vs greedy 43.0% (score 2.79) | vs random 93.5% | best 43.0%
+[ 10.4 min]   400,000 steps | win vs greedy 40.8% (score 2.86) | vs random 93.7% | best 43.0%
+[ 13.6 min]   500,000 steps | win vs greedy 41.8% (score 2.76) | vs random 95.0% | best 43.0%
+[ 22.9 min]   600,000 steps | win vs greedy 42.2% (score 2.77) | vs random 94.0% | best 43.0%

@@ -1,0 +1,8 @@
+{
+ "obs": "selfplay_v1",
+ "obs_players": 2,
+ "obs_cards": 8,
+ "num_players": 2,
+ "num_cards": 8,
+ "num_decks": 1
+}

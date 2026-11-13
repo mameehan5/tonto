@@ -25,7 +25,7 @@ def play(bots, decks, rounds, cards, seed):
 def evaluate(specs, games=500, decks=1, rounds=1, cards=4, seed0=0):
     """Returns per-spec-index win counts and score lists."""
     P = len(specs)
-    bots = [make_bot(s, seed=seed0 + k) for k, s in enumerate(specs)]
+    bots = [make_bot(s, seed=seed0 + k) if isinstance(s, str) else s for k, s in enumerate(specs)]
     wins, scores = np.zeros(P), [[] for _ in range(P)]
     rng = np.random.default_rng(seed0)
     for s in range(games):

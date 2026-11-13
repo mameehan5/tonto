@@ -69,3 +69,30 @@
 | greedy vs 3× greedy_v0 | 6 | 36.0% (even = 25%) |
 
 **Target for step 3:** PPO beats `greedy` > 50% head-to-head (2p, 4 cards), then larger configs.
+
+## 2026-11-12 — Step 3: training fixes + first models (branch `selfplay-training`)
+
+**Built**
+- `env/selfplay.py`: learner takes a random seat, opponents are bots/frozen snapshots. Obs now includes own peeked cards, opponents' face-up cards, discard top, deck size. Competitive terminal reward + potential-based shaping. Forced moves auto-applied.
+- `train_selfplay.py`: MaskablePPO, eval vs greedy/random every N steps, `eval.png` curve, snapshot pool, `--resume`.
+- `training/imitate.py`: behavior cloning from GreedyBot (99.5% move agreement, 2 min).
+- `scripts/compare.py` (head-to-head heatmap), `scripts/plot_runs.py`.
+
+**Results** (2 players; win rate vs tuned greedy, 1000 fixed deals) — see `plots/training_runs.png`, `plots/compare_2p4c.png`
+| Run | Setup | Best vs greedy |
+|---|---|---|
+| A | scratch, win reward, 4 cards | 42.8% (plateau by 300k) |
+| B | scratch, own-score reward, 4 cards | 43.0% (faster start) |
+| C | imitation + PPO, score reward, 4 cards | ~50%, mean score 0.63 → 0.07 |
+| D | C + win reward | ~50% |
+| E | imitation + PPO, 8 cards | ~48% |
+
+**Takeaways**
+- PPO from scratch reaches ~43% vs greedy, 95% vs random. Gap spread across all phases (diagnosed by swapping in greedy per phase).
+- Imitation warm start → greedy-level immediately; PPO fine-tuning is stable but hasn't exceeded greedy.
+- 4 cards leaves little room for skill (greedy vs greedy_v0 only 53%).
+
+**Open / next ideas**
+- Search-based play (sample hidden cards, roll out with greedy) → likely beats greedy; could then be distilled into the network (expert iteration).
+- Larger tables (4p/6 cards) where reading opponents matters more; longer runs, more envs (only 2 CPUs here).
+- Joker calls: PPO almost always calls 5 (rare event, little signal).

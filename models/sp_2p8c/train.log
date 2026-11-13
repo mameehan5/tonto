@@ -1,0 +1,7 @@
+Training 2p/8 cards for 1,500,000 steps -> models/sp_2p8c
+[  0.0 min]         2 steps | win vs greedy 47.0% (score -7.44) | vs random 96.8% | best 47.0%
+[  2.5 min]   100,000 steps | win vs greedy 46.7% (score -7.81) | vs random 97.7% | best 47.0%
+[  5.1 min]   200,000 steps | win vs greedy 47.6% (score -7.92) | vs random 97.8% | best 47.6%
+[  8.3 min]   300,000 steps | win vs greedy 47.5% (score -7.95) | vs random 97.3% | best 47.6%
+[ 12.2 min]   400,000 steps | win vs greedy 48.1% (score -7.97) | vs random 98.0% | best 48.1%
+[ 15.9 min]   500,000 steps | win vs greedy 47.9% (score -8.09) | vs random 98.4% | best 48.1%

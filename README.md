@@ -38,12 +38,27 @@ python tests/simulate_rules.py                      # random-play rule checks
 
 The GUI lets you play against bots, step through bot moves, undo, and toggle **Reveal all hands** to see every player's face-down cards (dashed = face-down, 👁 = peeked by owner) for evaluating bot play.
 
+## Training an AI Player
+
+```bash
+# 1) Imitation warm start: copy GreedyBot (~2 min)
+python training/imitate.py --players 2 --cards 4 --games 20000 --out models/bc_2p4c/bc.zip
+# 2) PPO fine-tuning vs greedy/random bots + frozen snapshots of itself
+python train_selfplay.py --players 2 --cards 4 --resume models/bc_2p4c/bc.zip --lr 5e-5 --clip 0.1 --out models/my_run
+#    (or train from scratch: drop --resume)
+python scripts/compare.py random greedy "PPO=ppo:models/my_run/best.zip"   # head-to-head heatmap
+```
+
+Each run writes `best.zip`, `eval.csv`, and `eval.png` (win rate vs greedy and random over training).
+The training env (`env/selfplay.py`) gives the agent one random seat, and its observation includes its peeked cards and opponents' face-up cards.
+
 ## Code Layout
 
 - `game/engine.py` — `TontoGame`: the rules engine (legal actions, `step`, per-player `view`, `to_dict`/`from_dict`). Everything else wraps this.
 - `game/bots.py` — `RandomBot`, `GreedyBot` (decide from their own view only); `make_bot("greedy" | "random" | "ppo:<path>")`.
 - `training/policy_bot.py` — wraps a trained MaskablePPO model as a bot. Models in `models/` appear as GUI seat options.
-- `env/environment.py` — Gymnasium wrapper for RL training.
+- `env/selfplay.py` — self-play training env (learner vs bots/snapshots, competitive reward). `env/environment.py` — original Gym wrapper.
+- `train_selfplay.py`, `training/imitate.py` — PPO training and behavior cloning. `scripts/compare.py`, `scripts/plot_runs.py` — evaluation plots.
 - `gui/` — local web GUI. `ui/terminal.py` — terminal UI.
 
 ## Game Setup
