@@ -27,6 +27,19 @@ After installing conda, please install the following packages
 conda install --yes numpy matplotlib gymnasium
 conda install --yes -c conda-forge sb3-contrib
 
+## Play With Friends (web app)
+
+```bash
+pip install -r requirements-server.txt
+uvicorn server.app:app --host 0.0.0.0 --port 8000
+```
+
+Open `http://<this computer's IP>:8000` on any phone on the same Wi-Fi. Start a table, share the 4-letter code (or the invite link), and fill empty seats with easy, medium or hard bots (hard = search bot). On iPhone, Safari → Share → **Add to Home Screen** makes it open like an app.
+
+- **Friends outside your Wi-Fi:** expose the server with a tunnel, e.g. `cloudflared tunnel --url http://localhost:8000` (gives a public https link), or Tailscale, or deploy the `Dockerfile` to any container host.
+- The server holds the real game; each phone only receives its own view (no peeking at others' cards). Games are saved to `rooms/` and survive restarts; reloading the page rejoins your seat.
+- Test: `python tests/test_server.py`.
+
 ## Quick Start
 
 ```bash
@@ -69,7 +82,8 @@ python training/train_apprentice.py data/exit1 --init models/bc_2p8c/bc.zip --de
 - `training/policy_bot.py` — wraps a trained MaskablePPO model as a bot. Models in `models/` appear as GUI seat options.
 - `env/selfplay.py` — self-play training env (learner vs bots/snapshots, competitive reward). `env/environment.py` — original Gym wrapper.
 - `train_selfplay.py`, `training/imitate.py` — PPO training and behavior cloning. `scripts/compare.py`, `scripts/plot_runs.py` — evaluation plots.
-- `gui/` — local web GUI. `ui/terminal.py` — terminal UI.
+- `server/` — multiplayer web app (FastAPI + WebSockets; `server/static/index.html` is the phone client).
+- `gui/` — local evaluation GUI (reveals all hands). `ui/terminal.py` — terminal UI.
 
 ## Game Setup
 

@@ -10,3 +10,4 @@ __pycache__/
 models/**/snapshots/
 models/**/latest.*
 data/
+rooms/

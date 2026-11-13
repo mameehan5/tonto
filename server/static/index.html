@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#183552">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tonto">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="icon" href="/static/icon-192.png">
+<title>Tonto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --table: #22476b; --table-deep: #183552; --table-line: #2f5a83;
+    --card: #fbf8f1; --ink: #1c1c22; --red: #c8102e; --gold: #f4b533; --mist: #a9bdd1;
+    --font: "Bricolage Grotesque", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 16px/1.4 var(--font); color: var(--card); background: var(--table-deep);
+    background-image: radial-gradient(ellipse at 50% 40%, var(--table) 0%, var(--table-deep) 75%);
+    background-attachment: fixed; min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 600;
+           background: var(--table-line); }
+  button.go { background: var(--gold); color: var(--ink); }
+  button.quiet { background: transparent; padding: 8px 10px; color: var(--mist); font-weight: 400; }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible, input:focus-visible, .card:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  input { background: var(--table-deep); border: 2px solid var(--table-line); border-radius: 12px; padding: 12px 14px; width: 100%; }
+  .screen { max-width: 560px; margin: 0 auto; padding: 20px 16px 32px; }
+  .hidden { display: none !important; }
+  h1 { font-size: 64px; line-height: 1; font-weight: 800; margin: 24px 0 4px; letter-spacing: -2px; }
+  h2 { font-size: 20px; margin: 28px 0 10px; font-weight: 600; }
+  p.sub { color: var(--mist); margin: 0 0 20px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .grow { flex: 1; }
+
+  /* Steppers for table settings */
+  .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 14px; }
+  .stepper { background: #0002; border-radius: 12px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .stepper span { color: var(--mist); font-size: 14px; }
+  .stepper b { font-size: 20px; min-width: 28px; text-align: center; display: inline-block; }
+  .stepper button { padding: 4px 12px; border-radius: 8px; background: var(--table-line); }
+
+  /* Cards */
+  .card { position: relative; aspect-ratio: 5 / 7; border-radius: 8%/6%; background: var(--card); color: var(--ink);
+          display: flex; flex-direction: column; justify-content: space-between; padding: 6% 8%;
+          box-shadow: 0 2px 0 #0003; user-select: none; container-type: inline-size; text-align: left; }
+  .card .r { font-weight: 800; font-size: 34cqw; line-height: 1; letter-spacing: -1px; }
+  .card .s { font-size: 40cqw; line-height: 1; align-self: flex-end; }
+  .card.red { color: var(--red); }
+  .card.joker { color: #5b3a8c; }
+  .card.joker .s { font-size: 30cqw; }
+  .card.back { background: var(--card); padding: 7%; }
+  .card.back::after { content: ""; flex: 1; border-radius: 6%/4%;
+    background: repeating-linear-gradient(45deg, var(--red) 0 3px, #e35d72 3px 6px); }
+  .card.peek { background: #e7e2d6; outline: 2px dashed #8b8473; outline-offset: -5px; }
+  .card.peek::before { content: "peeked"; position: absolute; bottom: 4%; left: 0; right: 0; text-align: center;
+                       font-size: 14cqw; color: #6f6959; }
+  .card.tap { cursor: pointer; box-shadow: 0 0 0 3px var(--gold); }
+  .card.tap:active { transform: translateY(2px); }
+  .card.mini { width: 26px; border-radius: 3px; padding: 2px 3px; box-shadow: none; }
+  .card.mini .r { font-size: 13px; letter-spacing: 0; }
+  .card.mini .s { font-size: 11px; }
+  .card.mini.back { padding: 2px; }
+  .card.mini.back::after { background: repeating-linear-gradient(45deg, var(--red) 0 2px, #e35d72 2px 4px); }
+  .card.mini.peek::before { content: none; }
+
+  /* Lobby: the room code as playing cards */
+  .code { display: flex; gap: 10px; margin: 8px 0 6px; }
+  .code .card { width: 64px; padding: 6px; align-items: center; justify-content: center; }
+  .code .card .r { font-size: 40px; }
+  .code .card:nth-child(odd) { color: var(--red); }
+  .code .card:nth-child(2) { transform: rotate(-4deg); }
+  .code .card:nth-child(3) { transform: rotate(3deg); }
+  .seat { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #ffffff1a; }
+  .seat .who { flex: 1; }
+  .seat .tag { color: var(--mist); font-size: 14px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #6b7f93; }
+  .dot.on { background: #7fd29b; }
+  .bots { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+
+  /* Game table */
+  .game { max-width: 640px; margin: 0 auto; padding: 10px 12px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 100dvh; }
+  .top { display: flex; justify-content: space-between; align-items: center; color: var(--mist); font-size: 14px; }
+  .opps { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .opp { background: #0000002b; border-radius: 12px; padding: 8px 10px; min-width: 120px; border: 2px solid transparent; }
+  .opp.turn { border-color: var(--gold); }
+  .opp .name { font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+  .opp .name span { color: var(--mist); font-weight: 400; }
+  .opp .cards { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; max-width: 150px; }
+  .middle { display: flex; gap: 18px; align-items: flex-end; justify-content: center; padding: 6px 0; }
+  .pile { text-align: center; color: var(--mist); font-size: 13px; }
+  .pile .card { width: 66px; margin: 0 auto 4px; }
+  .discards { display: flex; align-items: flex-end; }
+  .discards .card { width: 66px; margin-left: -38px; }
+  .discards .card:first-child { margin-left: 0; }
+  .discards .card .r { font-size: 22px; letter-spacing: -1.5px; }
+  .holding { display: flex; gap: 6px; align-items: flex-end; }
+  .holding .card { width: 66px; transform: rotate(4deg); }
+  .prompt { text-align: center; font-size: 17px; min-height: 48px; padding: 0 8px; }
+  .prompt.mine { color: var(--gold); font-weight: 600; }
+  .hand { display: grid; gap: 8px; }
+  .me-line { display: flex; justify-content: space-between; color: var(--mist); font-size: 14px; }
+  .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .ranks { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .ranks button { padding: 10px 0; }
+
+  .sheet { position: fixed; inset: 0; background: #0b1a2acc; display: flex; align-items: flex-end; justify-content: center; z-index: 5; }
+  .sheet > div { background: var(--table-deep); width: 100%; max-width: 560px; border-radius: 20px 20px 0 0;
+                 padding: 20px 18px calc(24px + env(safe-area-inset-bottom)); }
+  table.scores { width: 100%; border-collapse: collapse; margin: 10px 0 16px; }
+  table.scores td, table.scores th { padding: 8px 4px; text-align: right; border-bottom: 1px solid #ffffff1a; }
+  table.scores th { color: var(--mist); font-weight: 400; font-size: 14px; }
+  table.scores td:first-child, table.scores th:first-child { text-align: left; }
+  table.scores tr.lead td { color: var(--gold); font-weight: 600; }
+  .log { font-size: 14px; color: var(--mist); max-height: 50vh; overflow-y: auto; }
+  .log div { padding: 4px 0; }
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+           background: var(--card); color: var(--ink); padding: 10px 16px; border-radius: 12px; z-index: 9; max-width: 90vw; }
+  @media (prefers-reduced-motion: no-preference) {
+    .card.flipin { animation: flip .35s ease-out; }
+    @keyframes flip { from { transform: rotateY(90deg); } to { transform: none; } }
+  }
+</style>
+</head>
+<body>
+
+<!-- Home -->
+<section id="home" class="screen hidden">
+  <h1>Tonto</h1>
+  <p class="sub">The card game, at a table with your friends.</p>
+  <label for="name" class="sub" style="display:block;margin-bottom:6px">Your name</label>
+  <input id="name" maxlength="20" autocomplete="nickname" placeholder="e.g. Mike">
+
+  <h2>Join a table</h2>
+  <div class="row">
+    <input id="joinCode" class="grow" maxlength="4" placeholder="Code" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:4px">
+    <button class="go" onclick="join()">Join</button>
+  </div>
+
+  <h2>Start a table</h2>
+  <div class="settings" id="newSettings"></div>
+  <button class="go" style="width:100%" onclick="create()">Start a table</button>
+</section>
+
+<!-- Lobby -->
+<section id="lobby" class="screen hidden">
+  <p class="sub" style="margin:16px 0 0">Table code</p>
+  <div class="code" id="codeCards"></div>
+  <div class="row" style="margin-bottom:8px">
+    <button onclick="share()">Invite friends</button>
+    <button class="quiet" onclick="leave()">Leave table</button>
+  </div>
+  <h2>Players</h2>
+  <div id="seats"></div>
+  <div id="hostTools">
+    <div class="bots" id="botButtons"></div>
+    <h2>Rules for this table</h2>
+    <div class="settings" id="lobbySettings"></div>
+    <button class="go" id="startBtn" style="width:100%" onclick="send({type:'start'})">Deal</button>
+  </div>
+  <p class="sub" id="waitHost" style="margin-top:20px"></p>
+</section>
+
+<!-- Game -->
+<section id="game" class="game hidden">
+  <div class="top">
+    <span id="roundName"></span>
+    <span class="row" style="gap:0">
+      <button class="quiet" onclick="openSheet('log')">Moves</button>
+      <button class="quiet" onclick="openSheet('scores')">Scores</button>
+    </span>
+  </div>
+  <div class="opps" id="opps"></div>
+  <div class="middle">
+    <div class="pile"><div id="deck"></div><span id="deckCount"></span></div>
+    <div class="pile"><div class="discards" id="discard"></div><span>Discards</span></div>
+    <div class="pile" id="holdingWrap"><div class="holding" id="holding"></div><span>In your hand</span></div>
+  </div>
+  <div class="prompt" id="prompt"></div>
+  <div class="actions" id="actions"></div>
+  <div class="me-line"><span id="meName"></span><span id="meScore"></span></div>
+  <div class="hand" id="hand"></div>
+</section>
+
+<div id="sheet" class="sheet hidden" onclick="if (event.target === this) closeSheet()"><div id="sheetBody"></div></div>
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script>
+const SUITS = {0: '♣', 1: '♦', 2: '♥', 3: '♠'};
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const LIMITS = {players: [2, 12, 1], cards: [2, 20, 2], rounds: [1, 10, 1], decks: [1, 4, 1]};
+const LABELS = {players: 'Players', cards: 'Cards', rounds: 'Rounds', decks: 'Decks'};
+let S = null, ws = null, sheet = null, newSettings = {players: 4, cards: 6, rounds: 3, decks: 1}, lastLog = 0;
+const $ = id => document.getElementById(id);
+const store = {get: k => JSON.parse(localStorage.getItem(k) || 'null'), set: (k, v) => localStorage.setItem(k, JSON.stringify(v))};
+
+function show(id) {
+  for (const s of ['home', 'lobby', 'game']) $(s).classList.toggle('hidden', s !== id);
+}
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(t.timer); t.timer = setTimeout(() => t.classList.add('hidden'), 3500);
+}
+
+// Card HTML ---------------------------------------------------------------
+function cardHTML(c, {mini = false, peek = false, tap = null, cls = ''} = {}) {
+  const k = ['card', mini ? 'mini' : '', cls];
+  const click = tap !== null ? ` onclick="act(${tap})" role="button" tabindex="0" onkeydown="if(event.key==='Enter')act(${tap})"` : '';
+  if (tap !== null) k.push('tap');
+  if (!c) return `<div class="${k.join(' ')} back"${click} aria-label="face-down card"></div>`;
+  let r = RANKS[c.rank] ?? '', s = SUITS[c.suit] ?? '';
+  if (c.joker) { k.push('joker'); s = '★'; r = c.rank === 13 ? 'Jo' : r; }
+  else if (c.suit === 1 || c.suit === 2) k.push('red');
+  if (peek) k.push('peek');
+  const label = c.joker ? (c.rank === 13 ? 'joker' : `joker as ${r}`) : `${r}${s}`;
+  return `<div class="${k.join(' ')}"${click} aria-label="${label}${peek ? ', peeked' : ''}"><span class="r">${r}</span><span class="s">${s}</span></div>`;
+}
+const cardName = c => c ? (c.joker ? (c.rank === 13 ? 'a joker' : `a joker (${RANKS[c.rank]})`) : `${RANKS[c.rank]}${SUITS[c.suit]}`) : 'a card';
+
+// Settings steppers ---------------------------------------------------------
+function steppers(el, values, onChange, editable = true) {
+  el.innerHTML = Object.keys(LIMITS).map(k => `<div class="stepper"><span>${LABELS[k]}</span>
+    ${editable ? `<button aria-label="fewer ${LABELS[k]}" onclick="step_('${el.id}','${k}',-1)">−</button>` : ''}<b>${values[k]}</b>
+    ${editable ? `<button aria-label="more ${LABELS[k]}" onclick="step_('${el.id}','${k}',1)">+</button>` : ''}</div>`).join('');
+  el.onChange = onChange; el.values = values;
+}
+function step_(id, k, d) {
+  const el = $(id), [lo, hi, inc] = LIMITS[k], v = {...el.values};
+  v[k] = Math.min(hi, Math.max(lo, v[k] + d * inc));
+  el.onChange(v);
+}
+
+// Home ----------------------------------------------------------------------
+async function post(url, body) {
+  const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.detail || 'Something went wrong');
+  return d;
+}
+function myName() {
+  const n = $('name').value.trim();
+  if (!n) { $('name').focus(); toast('Enter your name first.'); return null; }
+  store.set('name', n); return n;
+}
+async function create() {
+  const name = myName(); if (!name) return;
+  try { enter(await post('/api/rooms', {name, ...newSettings})); } catch (e) { toast(e.message); }
+}
+async function join() {
+  const name = myName(); if (!name) return;
+  const code = $('joinCode').value.trim().toUpperCase();
+  if (code.length !== 4) return toast('Table codes are 4 letters.');
+  try { enter(await post(`/api/rooms/${code}/join`, {name})); } catch (e) { toast(e.message); }
+}
+function enter(d) { store.set('seat', {code: d.code, token: d.token}); history.replaceState(null, '', '/?table=' + d.code); connect(); }
+function leave() { store.set('seat', null); ws && ws.close(); ws = null; S = null; history.replaceState(null, '', '/'); home(); }
+function share() {
+  const url = `${location.origin}/?table=${S.code}`;
+  if (navigator.share) navigator.share({title: 'Play Tonto', text: `Join my Tonto table: ${S.code}`, url}).catch(() => {});
+  else navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'));
+}
+function renderNewSettings() {
+  steppers($('newSettings'), newSettings, v => { newSettings = v; renderNewSettings(); });
+}
+function home() {
+  $('name').value = store.get('name') || '';
+  $('joinCode').value = new URLSearchParams(location.search).get('table') || '';
+  renderNewSettings();
+  show('home');
+}
+
+// Connection ------------------------------------------------------------------
+function connect() {
+  const seat = store.get('seat');
+  if (!seat) return home();
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/${seat.code}?token=${seat.token}`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'error') { toast(m.message); if (m.fatal) leave(); return; }
+    S = m; render();
+  };
+  ws.onclose = () => { if (store.get('seat')) setTimeout(connect, 1500); };
+}
+const send = m => ws && ws.readyState === 1 && ws.send(JSON.stringify(m));
+const act = a => send({type: 'action', action: a});
+const nameOf = i => S.seats[i] ? S.seats[i].name : `Seat ${i + 1}`;
+
+// Render ------------------------------------------------------------------------
+function render() {
+  if (!S.view) return renderLobby();
+  renderGame();
+}
+
+function renderLobby() {
+  show('lobby');
+  sheet = null; $('sheet').classList.add('hidden');
+  $('codeCards').innerHTML = [...S.code].map(ch => `<div class="card"><span class="r">${ch}</span></div>`).join('');
+  $('seats').innerHTML = S.seats.map((s, i) => !s ? `<div class="seat"><span class="dot"></span><span class="who tag">Open seat</span></div>` :
+    `<div class="seat"><span class="dot ${s.bot || s.online ? 'on' : ''}"></span>
+      <span class="who">${esc(s.name)} ${i === S.you ? '<span class="tag">(you)</span>' : ''}</span>
+      ${S.is_host && i !== S.you ? `<button class="quiet" onclick="send({type:'remove',seat:${i}})">Remove</button>` : ''}</div>`).join('');
+  const open = S.seats.filter(s => !s).length;
+  $('hostTools').classList.toggle('hidden', !S.is_host);
+  $('botButtons').innerHTML = open ? Object.entries(S.bot_levels).map(([k, v]) =>
+    `<button onclick="send({type:'add_bot',level:'${k}'})">Add ${v.toLowerCase()}</button>`).join('') : '';
+  steppers($('lobbySettings'), S.settings, v => send({type: 'settings', ...v}), S.is_host);
+  $('startBtn').disabled = open > 0;
+  $('startBtn').textContent = open ? `Waiting for ${open} more ${open === 1 ? 'player' : 'players'}` : 'Deal';
+  $('waitHost').textContent = S.is_host ? (open ? 'Share the code, or fill seats with bots.' : '') :
+    `Waiting for ${nameOf(0)} to deal. ${S.settings.cards} cards each, ${S.settings.rounds} rounds.`;
+}
+
+function renderGame() {
+  show('game');
+  const v = S.view, me = v.players[S.you], legal = v.legal_actions;
+  const byKind = k => legal.filter(a => a.kind === k);
+  const myTurn = legal.length > 0;
+  $('roundName').textContent = v.game_complete ? 'Game over' : v.round_name.startsWith('Round') ? `${v.round_name} of ${v.num_rounds}` : v.round_name;
+
+  // Opponents, in turn order after me
+  const n = v.players.length;
+  $('opps').innerHTML = Array.from({length: n - 1}, (_, k) => v.players[(S.you + k + 1) % n]).map(p => `
+    <div class="opp ${p.id === v.current_player && !v.round_complete ? 'turn' : ''}" ${p.active ? '' : 'style="opacity:.4"'}>
+      <div class="name">${esc(nameOf(p.id))}<span>${p.total}</span></div>
+      <div class="cards">${p.cards.map(c => cardHTML(c.face_up ? c.card : null, {mini: true})).join('')}</div>
+      ${p.holding.length ? `<div class="tag" style="font-size:12px;margin-top:4px;color:var(--mist)">holding ${p.holding.map(c => c ? cardName(c) : 'a card').join(', ')}</div>` : ''}
+    </div>`).join('');
+
+  // Deck and discard pile (tap the k-th card from the top to pick up k)
+  const draw = byKind('draw_deck')[0];
+  $('deck').innerHTML = cardHTML(null, {tap: draw ? draw.action : null});
+  $('deckCount').textContent = `Deck ${v.deck_count}`;
+  const pick = Object.fromEntries(byKind('pickup_discard').map(a => [a.value, a.action]));
+  const top = v.discard_top.slice(-6), depth = i => top.length - i;
+  $('discard').innerHTML = top.map((c, i) => cardHTML(c, {tap: depth(i) === 1 ? pick[1] ?? null : null})).join('') || '<div class="card back" style="opacity:.2;width:66px"></div>';
+  $('holding').innerHTML = me.holding.map(c => cardHTML(c)).join('');
+  $('holdingWrap').classList.toggle('hidden', !me.holding.length);
+
+  // My hand: tap a card to replace or flip it
+  const tapFor = {};
+  for (const a of [...byKind('discard_own'), ...byKind('flip')]) tapFor[a.value] = a.action;
+  const cols = me.cards.length <= 4 ? me.cards.length : me.cards.length <= 8 ? 4 : me.cards.length <= 12 ? 6 : 7;
+  $('hand').style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  $('hand').innerHTML = me.cards.map((c, i) => cardHTML(c.card, {peek: !c.face_up && !!c.card, tap: tapFor[i] ?? null})).join('');
+  $('meName').textContent = `${nameOf(S.you)} (you)`;
+  $('meScore').textContent = `Showing ${me.flipped_score} · Total ${me.total}`;
+
+  // Prompt and buttons
+  const p = $('prompt'), acts = $('actions');
+  p.classList.toggle('mine', myTurn);
+  acts.innerHTML = '';
+  if (v.round_complete || v.game_complete) { p.textContent = ''; openSheet('scores', true); }
+  else if (!myTurn) p.textContent = `${nameOf(v.current_player)} is playing…`;
+  else if (v.phase === 'DRAW') {
+    p.textContent = top.length ? 'Your turn. Draw from the deck, or take from the discards.' : 'Your turn. Draw from the deck.';
+    const pile = v.discard_top;
+    acts.innerHTML = Object.entries(pick).filter(([k]) => +k > 1).map(([k, a]) =>
+      `<button onclick="act(${a})">Take top ${k}: ${pile.slice(-k).reverse().map(cardName).join(' ')}</button>`).join('');
+  }
+  else if (v.phase === 'DISCARD') {
+    const c = me.holding[me.holding.length - 1];
+    const drawn = byKind('discard_drawn')[0];
+    p.textContent = drawn ? `You drew ${cardName(c)}. Tap a face-down card to swap it in, or discard it.`
+                          : `Place ${cardName(c)}: tap a face-down card to replace${me.holding.length > 1 ? ` (${me.holding.length} to place)` : ''}.`;
+    if (drawn) acts.innerHTML = `<button onclick="act(${drawn.action})">Discard ${cardName(c)}</button>`;
+  }
+  else if (v.phase === 'FLIP') p.textContent = 'Flip one of your face-down cards.';
+  else if (v.phase === 'DECLARE_JOKER') {
+    p.textContent = 'Call your joker: pick the card it counts as.';
+    acts.innerHTML = `<div class="ranks">${byKind('declare_joker').map(a => `<button onclick="act(${a.action})">${RANKS[a.value]}</button>`).join('')}</div>`;
+  }
+  if (sheet === 'log') openSheet('log');
+  if (sheet === 'scores' && !v.round_complete && !v.game_complete) closeSheet();
+}
+
+// Sheets: scores (also shown at round end) and move log
+function openSheet(kind, auto = false) {
+  const v = S.view; sheet = kind;
+  if (kind === 'log') {
+    $('sheetBody').innerHTML = `<h2 style="margin-top:0">Moves</h2><div class="log">${v.log.slice(-40).map(e =>
+      `<div>${e.player === null ? `<b>${esc(e.text)}</b>` : `${esc(nameOf(e.player))} ${esc(e.text)}${e.detail ? ` (${esc(e.detail)})` : ''}`}</div>`).join('')}</div>
+      <button style="width:100%;margin-top:12px" onclick="closeSheet()">Close</button>`;
+  } else {
+    const roundCol = v.round_complete && !v.game_complete;
+    const after = p => p.total + (roundCol && p.active ? p.flipped_score : 0);
+    const players = [...v.players].sort((a, b) => after(a) - after(b));
+    const rounds = Math.max(...v.players.map(p => p.scores.length));
+    const head = v.game_complete ? `${esc(nameOf(v.winner))} ${v.winner === S.you ? '(you) win' : 'wins'}!`
+               : v.round_complete ? 'Round over' : 'Scores';
+    $('sheetBody').innerHTML = `<h2 style="margin-top:0;font-size:28px">${head}</h2>
+      <table class="scores"><tr><th>Player</th>${roundCol ? '<th>This round</th>' : ''}${Array.from({length: rounds}, (_, i) => `<th>R${i + 1}</th>`).join('')}<th>Total</th></tr>
+      ${players.map((p, k) => `<tr class="${k === 0 ? 'lead' : ''}"><td>${esc(nameOf(p.id))}${p.id === S.you ? ' (you)' : ''}</td>
+        ${roundCol ? `<td>${p.active ? p.flipped_score : ''}</td>` : ''}${Array.from({length: rounds}, (_, i) => `<td>${p.scores[i] ?? ''}</td>`).join('')}<td>${p.total + (roundCol && p.active ? p.flipped_score : 0)}</td></tr>`).join('')}
+      </table>
+      ${v.game_complete ? (S.is_host ? `<button class="go" style="width:100%" onclick="send({type:'rematch'})">Play again</button>` : `<p class="sub">Waiting for ${esc(nameOf(0))} to start another game.</p>`)
+        : roundCol ? `<button class="go" style="width:100%" onclick="send({type:'next_round'})">Deal next round</button>`
+        : `<button style="width:100%" onclick="closeSheet()">Close</button>`}`;
+  }
+  $('sheet').classList.remove('hidden');
+}
+function closeSheet() {
+  if (S && S.view && (S.view.round_complete || S.view.game_complete)) return;  // must act from the sheet
+  sheet = null; $('sheet').classList.add('hidden');
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+
+// Start: rejoin a saved seat, or show home (prefilling ?table=CODE)
+const saved = store.get('seat'), wanted = new URLSearchParams(location.search).get('table');
+if (saved && (!wanted || wanted === saved.code)) connect(); else home();
+</script>
+</body>
+</html>

@@ -224,7 +224,8 @@ class TontoGame:
             "discard_count": len(rs.discard_pile),
             "players": [player_view(p) for p in self.player_state],
             "legal_actions": [
-                {"action": a, "label": self.action_label(a)} for a in self.legal_actions()
+                {"action": a, "label": self.action_label(a), "kind": decode_action(a)[0], "value": decode_action(a)[1]}
+                for a in self.legal_actions()
             ] if my_turn and not rs.complete else [],
             # `detail` holds private info (e.g. the card drawn from the deck)
             "log": [e if viewer is None or e["player"] == viewer else {**e, "detail": None} for e in self.log],

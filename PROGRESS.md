@@ -121,3 +121,14 @@ Search speed: ~230–340 ms/move median (2p/8, 4p/6, 4p/8), max ~1–2 s → fin
 - Search is the first bot that clearly beats greedy, with no neural network.
 - Distilling it into the network failed at this data scale: ~40k searched moves (2 CPUs, ~1 h). Search choices are noisy (greedy agrees with search on 58%), and the network can't separate real improvements from noise.
 - Next: generate 300k+ searched moves on a many-core machine (same script, `--workers`), more samples per move (48+) for cleaner labels, then retrain; or use search directly as the app's computer player.
+
+## 2026-11-13 — Steps 4–5: multiplayer server + phone web app (branch `multiplayer`)
+
+**Built**
+- `server/app.py` (FastAPI + WebSockets): 4-letter table codes, host sets rules (players/cards/rounds/decks), friends join by code or invite link, host fills seats with Easy (`greedy_v0`), Medium (`greedy`) or Hard (`search:24`) bots. Server-authoritative: each phone gets only `game.view(seat)`. Forced moves (end turn) auto-applied. Bots move with a 0.7 s pause; search runs off the event loop. Rooms saved to `rooms/*.json` (survive restarts); reload rejoins your seat.
+- `server/static/index.html`: mobile-first client, installable to the iPhone home screen (manifest + icons). Tap deck/discard/your cards to play; "Take top N" buttons for multi-card pickups; joker rank picker; scores sheet at round end; move log.
+- `Dockerfile`, `requirements-server.txt`, `tests/test_server.py` (2 humans + bot, full games, privacy + out-of-turn + save/reload checks).
+
+**Verified:** 5 scripted games via websockets (no leaks of hidden cards or private draws); full 3-round games in two simulated iPhones through the real UI; reload mid-game rejoins; hard bot turn ≤ ~3 s including deliberate pauses.
+
+**Next:** host it where friends can reach it (desktop + tunnel, or a container host); add the trained network as a bot once it beats greedy; native SwiftUI app later if wanted.
