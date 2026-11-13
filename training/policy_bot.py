@@ -3,6 +3,8 @@ from sb3_contrib.ppo_mask import MaskablePPO
 
 from env.environment import make_obs
 from env.selfplay import encode_obs, load_config
+from game.bots import GreedyBot
+from game.phases import Phase
 
 
 class PolicyBot:
@@ -10,8 +12,11 @@ class PolicyBot:
         self.model = model or MaskablePPO.load(path, device="cpu")
         self.config = config or (load_config(path) if path else None)  # None -> legacy TontoEnv obs
         self.deterministic = deterministic
+        self.greedy = GreedyBot() if self.config and self.config.get("greedy_jokers") else None
 
     def act(self, game, pid):
+        if self.greedy and game.phase == Phase.DECLARE_JOKER:
+            return self.greedy.act(game, pid)
         if self.config:
             obs = encode_obs(game, pid, self.config["obs_players"], self.config["obs_cards"])
         else:

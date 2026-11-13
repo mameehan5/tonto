@@ -47,6 +47,41 @@ def collect(args):
     return np.array(X), np.array(M), np.array(A), np.array(V, dtype=np.float32)
 
 
+def fit(model, X, M, A, V, epochs, lr=1e-3, value_coef=0.5, Q=None, tau=0.1):
+    """Supervised training of the policy and value head (MSE on V).
+    Policy target: the chosen action A, or if Q (per-action search values, NaN = not a candidate) is
+    given, the soft target softmax(Q / tau), which is less noisy than the argmax."""
+    if Q is not None:
+        Qt = np.where(np.isnan(Q), -np.inf, Q / tau)
+        P = np.exp(Qt - Qt.max(1, keepdims=True))
+        P = (P / P.sum(1, keepdims=True)).astype(np.float32)
+    pol = model.policy
+    opt = torch.optim.Adam(pol.parameters(), lr=lr)
+    n_val = len(X) // 10
+    perm = np.random.default_rng(0).permutation(len(X))
+    val, tr = perm[:n_val], perm[n_val:]
+    T = lambda z, idx: torch.as_tensor(z[idx])
+    for ep in range(epochs):
+        pol.train()
+        np.random.shuffle(tr)
+        for b in range(0, len(tr), 1024):
+            idx = tr[b:b + 1024]
+            values, logp, _ = pol.evaluate_actions(T(X, idx), T(A, idx), action_masks=T(M, idx))
+            if Q is not None:
+                logits = pol.get_distribution(T(X, idx), action_masks=M[idx]).distribution.logits
+                logp = (T(P, idx) * logits).sum(1)  # logits are log-probs (normalized); masked ones ~ -1e8 x 0
+            loss = -logp.mean() + value_coef * torch.mean((values.flatten() - T(V, idx)) ** 2)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+        pol.eval()
+        with torch.no_grad():
+            dist = pol.get_distribution(T(X, val), action_masks=M[val])
+            acc = (dist.distribution.probs.argmax(1).numpy() == A[val]).mean()
+            vloss = torch.mean((pol.predict_values(T(X, val)).flatten() - T(V, val)) ** 2).item()
+        print(f"epoch {ep + 1:2d}: held-out accuracy {acc:.1%}  value MSE {vloss:.3f}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--players", type=int, default=2)
@@ -67,29 +102,7 @@ def main():
 
     env = SelfPlayEnv(a.players, a.cards)
     model = MaskablePPO("MlpPolicy", env, policy_kwargs={"net_arch": [256, 256]}, device="cpu", verbose=0)
-    pol = model.policy
-    opt = torch.optim.Adam(pol.parameters(), lr=1e-3)
-    n_val = len(X) // 10
-    perm = np.random.default_rng(0).permutation(len(X))
-    val, tr = perm[:n_val], perm[n_val:]
-    T = lambda z, idx: torch.as_tensor(z[idx])
-
-    for ep in range(a.epochs):
-        pol.train()
-        np.random.shuffle(tr)
-        for b in range(0, len(tr), 1024):
-            idx = tr[b:b + 1024]
-            values, logp, _ = pol.evaluate_actions(T(X, idx), T(A, idx), action_masks=T(M, idx))
-            loss = -logp.mean() + 0.5 * torch.mean((values.flatten() - T(V, idx)) ** 2)
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-        pol.eval()
-        with torch.no_grad():
-            dist = pol.get_distribution(T(X, val), action_masks=M[val])
-            acc = (dist.distribution.probs.argmax(1).numpy() == A[val]).mean()
-            vloss = torch.mean((pol.predict_values(T(X, val)).flatten() - T(V, val)) ** 2).item()
-        print(f"epoch {ep + 1:2d}: held-out accuracy {acc:.1%}  value MSE {vloss:.3f}", flush=True)
+    fit(model, X, M, A, V, a.epochs)
 
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     model.save(a.out)

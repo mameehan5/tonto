@@ -53,9 +53,10 @@ class Session:
     def state(self, reveal):
         humans = [i for i, s in enumerate(self.seats) if s == "human"]
         viewer = None if reveal or not humans else humans[0]
-        models = [f"ppo:{p.relative_to(ROOT)}" for p in sorted(ROOT.glob("models/**/*.zip"))]
+        models = [f"ppo:{p.relative_to(ROOT)}" for p in sorted(ROOT.glob("models/**/*.zip"))
+                  if "snapshots" not in p.parts and p.stem != "latest"]
         return {"view": self.game.view(viewer), "seats": self.seats, "can_undo": bool(self.history),
-                "seat_options": ["human"] + [b for b in BOTS if b != "greedy_v0"] + ["greedy_v0"] + models,
+                "seat_options": ["human", "greedy", "search:16", "search:48", "random", "greedy_v0"] + models,
                 "warning": self.warning, "config": self.game.to_dict()["config"]}
 
 

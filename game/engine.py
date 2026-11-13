@@ -2,6 +2,8 @@
 
 The Gym env, GUI, and (later) game server all wrap this class.
 """
+import copy
+
 import numpy as np
 
 from game.cards import Card, create_standard_deck
@@ -243,7 +245,31 @@ class TontoGame:
         return text
 
     def _log(self, player, text, detail=None):
+        if self.log is None:  # logging disabled (search rollouts)
+            return
         self.log.append({"player": player, "text": text, "detail": detail})
+
+    # Fast copy for simulations ------------------------------------------------
+
+    def clone(self):
+        """Independent copy for search rollouts (log not copied; rng is fresh)."""
+        cc = lambda cs: [copy.copy(c) if c.suit == 4 else c for c in cs]  # only jokers are mutated
+        g = copy.copy(self)
+        g.rng = np.random.default_rng(self.rng.integers(1 << 62))
+        g.log = None
+        g.active_players = list(self.active_players)
+        g.game_state = copy.copy(self.game_state)
+        rs = copy.copy(self.round_state)
+        rs.draw_deck, rs.discard_pile = cc(rs.draw_deck), cc(rs.discard_pile)
+        g.round_state = rs
+        g.player_state = []
+        for p in self.player_state:
+            q = copy.copy(p)
+            q._cards, q.holding_cards = cc(p._cards), cc(p.holding_cards)
+            q.face_up, q.private_seen = p.face_up.copy(), p.private_seen.copy()
+            q.individual_scores, q.tiebreak_scores = list(p.individual_scores), list(p.tiebreak_scores)
+            g.player_state.append(q)
+        return g
 
     # Serialization -----------------------------------------------------------
 

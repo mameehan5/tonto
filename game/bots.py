@@ -1,5 +1,6 @@
 """Rule-based bots. Each bot decides using only its own player view."""
 from collections import Counter
+from functools import lru_cache
 
 import numpy as np
 
@@ -24,6 +25,11 @@ def estimate(ranks, n_unknown, unknown_value=UNKNOWN_VALUE):
 
 
 def _score(ranks):
+    return _score_sorted(tuple(sorted(ranks)))
+
+
+@lru_cache(maxsize=200_000)
+def _score_sorted(ranks):
     return sum(rank_score(r, n) for r, n in Counter(ranks).items())
 
 
@@ -43,12 +49,13 @@ class GreedyBot:
         self.unknown_value = unknown_value
 
     def act(self, game, pid):
-        view = game.view(pid)
-        me = view["players"][pid]
-        slots = [c["card"]["rank"] if c["card"] else None for c in me["cards"]]
-        face_down = [i for i, c in enumerate(me["cards"]) if not c["face_up"]]
+        # Read only what this player can see (equivalent to game.view(pid), but much faster)
+        p = game.player_state[pid]
+        slots = [c.rank if (up or seen) else None for c, up, seen in zip(p.cards, p.face_up, p.private_seen)]
+        face_down = [i for i, up in enumerate(p.face_up) if not up]
         legal = set(game.legal_actions())
-        phase = view["phase"]
+        phase = game.phase.name
+        discard_top = [c.rank for c in game.round_state.discard_pile[-game.num_cards:]]
 
         def est_with(replacements):
             s = list(slots)
@@ -64,7 +71,7 @@ class GreedyBot:
 
         if phase == "DRAW":
             # Consider picking up the top n discards, placed greedily into face-down slots
-            top = [c["rank"] for c in view["discard_top"]][::-1]  # top card first
+            top = discard_top[::-1]  # top card first
             best_n, best_gain = 0, self.pickup_threshold
             for n in range(1, game.max_draw_from_discard + 1):
                 repl = {}
@@ -76,7 +83,7 @@ class GreedyBot:
             return Action.PICKUP_DISCARD_0 + best_n - 1 if best_n else Action.DRAW_DECK
 
         if phase == "DISCARD":
-            rank = me["holding"][-1]["rank"]
+            rank = p.holding_cards[-1].rank
             i = best_slot(rank)
             if Action.DISCARD_DRAWN in legal and est_with({i: rank}) >= now:
                 return Action.DISCARD_DRAWN
@@ -90,7 +97,7 @@ class GreedyBot:
             return Action.FLIP_0 + face_down[0]
 
         if phase == "DECLARE_JOKER":
-            j = next(i for i, c in enumerate(me["cards"]) if c["face_up"] and c["card"]["rank"] == JOKER)
+            j = next(i for i, c in enumerate(p.cards) if p.face_up[i] and c.rank == JOKER)
             return Action.DECLARE_JOKER_0 + min(range(13), key=lambda r: est_with({j: r}))
 
         return Action.END_TURN
@@ -104,7 +111,10 @@ BOTS = {
 
 
 def make_bot(spec, seed=None):
-    """'greedy', 'random', or 'ppo:<path to model.zip>'."""
+    """'greedy', 'greedy_v0', 'random', 'search[:samples]', or 'ppo:<path to model.zip>'."""
+    if spec.startswith("search"):
+        from game.search import SearchBot
+        return SearchBot(int(spec.split(":")[1]) if ":" in spec else 16, seed=seed)
     if spec.startswith("ppo:"):
         from training.policy_bot import PolicyBot  # needs torch/sb3; import only when used
         return PolicyBot(spec[4:])

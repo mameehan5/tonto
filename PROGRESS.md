@@ -96,3 +96,28 @@
 - Search-based play (sample hidden cards, roll out with greedy) → likely beats greedy; could then be distilled into the network (expert iteration).
 - Larger tables (4p/6 cards) where reading opponents matters more; longer runs, more envs (only 2 CPUs here).
 - Joker calls: PPO almost always calls 5 (rare event, little signal).
+
+## 2026-11-12 — Expert iteration, round 1 (branch `expert-iteration`)
+
+**Built**
+- `game/search.py` `SearchBot` (`search:N`): sample hidden cards N times, play each candidate move out with greedy, pick best average (win/loss + small margin). Same sampled deal for every move.
+- Speedups: GreedyBot reads state directly (4× faster, identical moves over 300 games); `TontoGame.clone()` 31 µs (12× faster than deepcopy); logging off in rollouts.
+- `training/expert_data.py` (restartable search self-play data), `training/train_apprentice.py` (fit network to search moves; `--delta` keeps greedy's move unless search is clearly better; `--greedy-games` mixes in greedy data; `--soft` value-based targets), `training/obs_greedy.py` (greedy's move from an obs; matches 9,416/9,416).
+- PolicyBot uses greedy for joker calls when `greedy_jokers` is set (search data has no joker decisions).
+- GUI seats: `search:16`, `search:48`.
+
+**Results** (2 players, 8 cards, vs tuned greedy)
+| Bot | Win rate |
+|---|---|
+| search:16 (500 games) | **54.6% ± 4.4%** |
+| search:48 (300 games) | **62.3% ± 5.5%** |
+| apprentice, raw search labels (35k moves) | 37% |
+| apprentice, delta 0.3 | 42% |
+| apprentice, delta 0.3 + 217k greedy moves | 48.6% |
+
+Search speed: ~230–340 ms/move median (2p/8, 4p/6, 4p/8), max ~1–2 s → fine as an app opponent.
+
+**Takeaways**
+- Search is the first bot that clearly beats greedy, with no neural network.
+- Distilling it into the network failed at this data scale: ~40k searched moves (2 CPUs, ~1 h). Search choices are noisy (greedy agrees with search on 58%), and the network can't separate real improvements from noise.
+- Next: generate 300k+ searched moves on a many-core machine (same script, `--workers`), more samples per move (48+) for cleaner labels, then retrain; or use search directly as the app's computer player.

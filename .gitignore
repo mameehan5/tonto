@@ -9,3 +9,4 @@ __pycache__/
 # Training artifacts (keep best models, logs, plots)
 models/**/snapshots/
 models/**/latest.*
+data/

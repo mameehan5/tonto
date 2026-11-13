@@ -52,9 +52,19 @@ python scripts/compare.py random greedy "PPO=ppo:models/my_run/best.zip"   # hea
 Each run writes `best.zip`, `eval.csv`, and `eval.png` (win rate vs greedy and random over training).
 The training env (`env/selfplay.py`) gives the agent one random seat, and its observation includes its peeked cards and opponents' face-up cards.
 
+### Search bot and expert iteration
+
+`search:N` is a determinized Monte Carlo search bot: for each move it samples the hidden cards N times, plays every candidate move out with greedy, and picks the best average. It beats greedy (2p/8 cards: 55% at N=16, 62% at N=48) at ~0.25 s/move, and is available as a GUI seat and in `eval_bots.py`.
+
+```bash
+python training/expert_data.py --cards 8 --games 2000 --samples 32 --workers 8 --out data/exit1   # restartable
+python training/train_apprentice.py data/exit1 --init models/bc_2p8c/bc.zip --delta 0.3 --greedy-games 6000 --out models/exit1/apprentice.zip
+```
+
 ## Code Layout
 
 - `game/engine.py` — `TontoGame`: the rules engine (legal actions, `step`, per-player `view`, `to_dict`/`from_dict`). Everything else wraps this.
+- `game/search.py` — `SearchBot` (Monte Carlo search over sampled hidden cards).
 - `game/bots.py` — `RandomBot`, `GreedyBot` (decide from their own view only); `make_bot("greedy" | "random" | "ppo:<path>")`.
 - `training/policy_bot.py` — wraps a trained MaskablePPO model as a bot. Models in `models/` appear as GUI seat options.
 - `env/selfplay.py` — self-play training env (learner vs bots/snapshots, competitive reward). `env/environment.py` — original Gym wrapper.

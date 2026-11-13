@@ -37,6 +37,23 @@ def evaluate(specs, games=500, decks=1, rounds=1, cards=4, seed0=0):
     return wins, scores
 
 
+def _worker(args):
+    specs, games, decks, rounds, cards, seed0 = args
+    return evaluate(specs, games, decks, rounds, cards, seed0)
+
+
+def evaluate_parallel(specs, games, decks=1, rounds=1, cards=4, seed0=0, workers=2):
+    """Same as evaluate() split across processes (bots must be given as spec strings)."""
+    from multiprocessing import Pool
+    chunk = -(-games // workers)
+    with Pool(workers) as pool:
+        parts = pool.map(_worker, [(specs, min(chunk, games - i * chunk), decks, rounds, cards, seed0 + 7919 * i)
+                                   for i in range(workers)])
+    wins = sum(p[0] for p in parts)
+    scores = [sum((p[1][k] for p in parts), []) for k in range(len(specs))]
+    return wins, scores
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("bots", nargs="+")
@@ -44,8 +61,10 @@ if __name__ == "__main__":
     ap.add_argument("--decks", type=int, default=1)
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--cards", type=int, default=4)
+    ap.add_argument("--workers", type=int, default=1)
     a = ap.parse_args()
-    wins, scores = evaluate(a.bots, a.games, a.decks, a.rounds, a.cards)
+    wins, scores = (evaluate_parallel(a.bots, a.games, a.decks, a.rounds, a.cards, workers=a.workers)
+                    if a.workers > 1 else evaluate(a.bots, a.games, a.decks, a.rounds, a.cards))
     print(f"{len(a.bots)} players, {a.cards} cards, {a.decks} deck(s), {a.rounds} round(s), {a.games} games "
           f"(even skill = {1 / len(a.bots):.0%} each)")
     for k, name in enumerate(a.bots):
