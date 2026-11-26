@@ -5,6 +5,7 @@ from game.phases import Phase
 
 import numpy as np
 import copy
+import warnings
 
 from collections import Counter
 
@@ -22,6 +23,19 @@ class GameState:
         assert type(self.num_cards) is int
         assert self.num_cards % 2 == 0
         assert 2 <= self.num_cards <= 20
+        assert 2 <= self.num_players <= 12
+        assert 1 <= self.num_decks <= 4
+        assert 1 <= self.num_rounds <= 10
+
+        # Need at least 2 cards left over (1 draw pile + 1 discard) to deal and reshuffle
+        dealt = self.num_players * self.num_cards
+        assert dealt <= self.num_decks * 54 - 2, f"Too many cards dealt ({dealt}) for {self.num_decks} deck(s)"
+        # Each turn draws at most one card from the deck, and a round lasts at most ~dealt turns
+        if 2 * dealt + 1 > self.num_decks * 54:
+            warnings.warn(
+                f"{self.num_players} players x {self.num_cards} cards with {self.num_decks} deck(s): "
+                "the draw deck may run out, and reshuffling the discard pile may be required."
+            )
 
         self.current_player = 0
         self.current_round = 0
@@ -53,6 +67,7 @@ class PlayerState:
 
     def __post_init__(self):
         self.individual_scores: list[int] = []
+        self.tiebreak_scores: list[int] = []
         self.reset()
 
     def reset(self, cards: Optional[list[Optional[Card]]] = None):
@@ -115,7 +130,7 @@ class PlayerState:
         assert np.any(self.visible_undeclared_jokers)
         idx = np.argmax(self.visible_undeclared_jokers)
         assert self.is_face_up(idx)
-        assert self.cards[idx].rank == -1 and self.cards[idx].suit == 4
+        assert self.cards[idx].rank == 13 and self.cards[idx].suit == 4
         self.cards[idx].rank = rank
 
     @property
@@ -123,26 +138,17 @@ class PlayerState:
         cards = copy.deepcopy(self.cards + self.holding_cards)
         known = self.face_up & self.private_seen
         known = np.concatenate([known, np.ones_like(self.holding_cards, dtype=bool)])
-        if any(c.rank == -1 for c in cards if c is not None):
-            # Identify jokers
-            jokers = np.zeros((len(cards)), dtype=bool)
-            for i,card in enumerate(cards):
-                jokers[i] = True
-
-            # Assign joker best possible rank
-            for i,(card,joke) in enumerate(zip(cards,jokers)):
-                if joke:
-                    card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
-                    best = sum(rank_score(rank, count) for rank, count in card_counts.items())
-                    best_rank = -1
-                    for r in range(13):
-                        card.rank = r
-                        card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
-                        score = min(best, sum(rank_score(rank, count) for rank, count in card_counts.items()))
-                        if score <= best:
-                            best_rank = r
-                            best = score
-                    card.rank = best_rank
+        # Assign each known, undeclared joker its best possible rank
+        for card, k in zip(cards, known):
+            if k and card.rank == 13:
+                best, best_rank = None, 13
+                for r in range(13):
+                    card.rank = r
+                    counts = Counter(c.rank for c, kk in zip(cards, known) if kk)
+                    score = sum(rank_score(rank, n) for rank, n in counts.items())
+                    if best is None or score < best:
+                        best, best_rank = score, r
+                card.rank = best_rank
 
         card_counts = Counter(c.rank for c, k in zip(cards, known) if k)
         return sum(rank_score(rank, count) for rank, count in card_counts.items())
@@ -163,7 +169,7 @@ class PlayerState:
     
     @property
     def visible_undeclared_jokers(self):
-        return self.face_up & (self.card_suits == 4) & (self.card_ranks == -1)
+        return self.face_up & (self.card_suits == 4) & (self.card_ranks == 13)
 
 def rank_score(rank, count):
     assert 0 <= rank <= 13

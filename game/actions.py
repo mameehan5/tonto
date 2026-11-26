@@ -3,7 +3,8 @@ import numpy as np
 
 from game.phases import Phase
 
-MAX_CARDS = 12
+MAX_CARDS = 20
+MAX_PLAYERS = 12
 NUM_RANKS = 13
 
 RANK_STRS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]

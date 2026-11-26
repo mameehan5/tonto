@@ -21,7 +21,7 @@ from sb3_contrib.ppo_mask import MaskablePPO
 def print_scores(env: TontoEnv):
     print("\nScores after round", env.game_state.current_round)
     for i, player in enumerate(env.player_state):
-        print(f"Player {i}: Individual scores: {player.individual_scores} | Total score: {player.total_score}")
+        print(f"Player {i}: Individual scores: {player.individual_scores} | Total score: {player.total_score}" + (f" | Tiebreak: {player.tiebreak_scores}" if player.tiebreak_scores else ""))
 
 def print_cards(player):
     for i, c in enumerate(player.cards):
@@ -147,7 +147,10 @@ def run_terminal_game(env, human_players, ppo_model=None):
 
     while not tonto_env.game_state.complete:
         print(80*"-")
-        print(f'\nRound {tonto_env.game_state.current_round+1}')
+        if tonto_env.game_state.current_round < tonto_env.num_rounds:
+            print(f'\nRound {tonto_env.game_state.current_round+1}')
+        else:
+            print(f'\nTiebreak round: players {tonto_env.active_players}')
         print(80*"-")
 
         while not tonto_env.round_state.complete:
@@ -188,7 +191,7 @@ def run_terminal_game(env, human_players, ppo_model=None):
         print_scores(tonto_env)
 
     print("\n" + 80*"=")
-    print("Game over! All rounds completed.")
+    print(f"Game over! Player {tonto_env.winner} wins.")
     print(80*"=")
 
 if __name__ == '__main__':
